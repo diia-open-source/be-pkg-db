@@ -26,7 +26,7 @@ This repository contains the package with database connection; migration config 
 Example:
 
 ```
-git clone https://github.com/diia-open-source/pkg-db.git
+git clone https://github.com/diia-open-source/be-pkg-db.git pkg-db
 ```
 
 ---
