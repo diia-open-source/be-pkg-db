@@ -162,7 +162,8 @@ export class DatabaseService implements OnInit, OnHealthCheck {
         const modelsPath = `./dist/${modelsDir || this.defaultModelsDir}`
 
         try {
-            if (!fs.existsSync(modelsPath)) {
+            const exists = await fs.promises.access("package.json").then(()=>true).catch(()=>false);
+            if (!exists) {
                 this.logger.info('Models dir is absent, indexes sync skipped')
 
                 return
