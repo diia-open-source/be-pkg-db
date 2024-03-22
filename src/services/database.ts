@@ -25,7 +25,6 @@ export class DatabaseService implements OnInit, OnHealthCheck {
 
     constructor(
         private readonly dbConfigs: Record<DbType, AppDbConfig>,
-
         private readonly envService: EnvService,
         private readonly logger: Logger,
     ) {}
@@ -65,6 +64,7 @@ export class DatabaseService implements OnInit, OnHealthCheck {
 
     async createDbConnection(type: DbType, config: AppDbConfig): Promise<AppDb | undefined> {
         const { isEnabled } = config
+
         if (typeof isEnabled === 'boolean' && !isEnabled) {
             this.logger.info(`Database is disabled: ${type}`)
 
@@ -72,65 +72,10 @@ export class DatabaseService implements OnInit, OnHealthCheck {
         }
 
         try {
-            const { host, port, database, authSource, user, password, replicaSet, replicaSetNodes, readPreference } = config
+            const connectionOptions = this.initializeConnectionOptions(config)
+            const connectionString = this.initializeConnectionString(config)
 
-            const connectionOptions: mongoose.ConnectOptions = {}
-            let hosts: string[] = []
-            if (host) {
-                if (port) {
-                    hosts.push(`${host}:${port}`)
-                } else {
-                    hosts.push(`${host}`)
-                }
-            }
-
-            if (user && password) {
-                connectionOptions.auth = { username: user, password }
-            }
-
-            if (replicaSet) {
-                connectionOptions.replicaSet = replicaSet
-            }
-
-            if (replicaSetNodes) {
-                if (host) {
-                    const errMsg = 'Must be only `host` and `port` or `replicaSetNodes` config'
-
-                    this.logger.error('Wrong database configuration:', errMsg)
-                    throw new Error(errMsg)
-                }
-
-                hosts = replicaSetNodes.map(({ replicaHost }) => `${replicaHost}:${port}`)
-            }
-
-            let connectionString = `mongodb://${hosts.join(',')}/`
-            if (database) {
-                connectionOptions.dbName = database
-            }
-
-            const query: string[] = []
-
-            if (authSource) {
-                query.push(`authSource=${authSource}`)
-            }
-
-            if (readPreference) {
-                query.push(`readPreference=${readPreference}`)
-            }
-
-            if (query.length) {
-                connectionString += `?${query.join('&')}`
-            }
-
-            const logOptions = cloneDeep(connectionOptions)
-            if (logOptions.auth) {
-                logOptions.auth = {
-                    username: '********',
-                    password: '********',
-                }
-            }
-
-            this.logger.info(`Connecting to DB ${connectionString} ${type}`, logOptions)
+            this.logger.info(`Connecting to DB ${connectionString} ${type}`, this.initializeLogOptions(connectionOptions))
             if (this.envService.isLocal() || this.envService.isTest()) {
                 this.logger.debug('Mongoose set to Debug')
                 mongoose.set('debug', (coll, method, dbQuery, doc, options) => {
@@ -138,13 +83,7 @@ export class DatabaseService implements OnInit, OnHealthCheck {
                 })
             }
 
-            let connection: mongoose.Connection
-            if (type === DbType.Main) {
-                await mongoose.connect(connectionString, connectionOptions)
-                connection = mongoose.connection
-            } else {
-                connection = await mongoose.createConnection(connectionString, connectionOptions).asPromise()
-            }
+            const connection = await this.connectToMongoose(type, connectionString, connectionOptions)
 
             connection.on('error', (err) => {
                 this.logger.error('Mongo connection error', { err, type })
@@ -227,5 +166,96 @@ export class DatabaseService implements OnInit, OnHealthCheck {
         this.logger.info(`Start syncing indexes for the ${model.modelName} collection`)
         await model.syncIndexes()
         this.logger.info(`Ended syncing indexes for the ${model.modelName} collection in ${Date.now() - t0} ms`)
+    }
+
+    private initializeConnectionOptions(config: AppDbConfig): mongoose.ConnectOptions  {
+        const {user,password,replicaSet,database} = config;
+
+        const options: mongoose.ConnectOptions = {}
+
+        if (user && password) {
+            options.auth = { username: user, password }
+        }
+
+        if (replicaSet) {
+            options.replicaSet = replicaSet
+        }
+
+        if (database) {
+            options.dbName = database
+        }
+
+        return options
+    }
+
+    private initializeConnectionString(config: AppDbConfig): string  {
+        const { host,port, replicaSetNodes } = config;
+
+        let hosts: string[] = []
+
+        if (host) {
+            if (port) {
+                hosts.push(`${host}:${port}`)
+            } else {
+                hosts.push(`${host}`)
+            }
+        }
+
+        if (replicaSetNodes) {
+            if (host) {
+                const errMsg = 'Must be only `host` and `port` or `replicaSetNodes` config'
+
+                this.logger.error('Wrong database configuration:', errMsg)
+                throw new Error(errMsg)
+            }
+
+            hosts = replicaSetNodes.map(({ replicaHost }) => `${replicaHost}:${port}`)
+        }
+
+        let connectionString = `mongodb://${hosts.join(',')}/`
+
+        const { authSource, readPreference } = config;
+
+        const query: string[] = []
+
+        if (authSource) {
+            query.push(`authSource=${authSource}`)
+        }
+
+        if (readPreference) {
+            query.push(`readPreference=${readPreference}`)
+        }
+
+        if (query.length) {
+            connectionString += `?${query.join('&')}`
+        }
+
+        return connectionString
+    }
+
+    private initializeLogOptions(connectionOptions: mongoose.ConnectOptions): mongoose.ConnectOptions  {
+        const logOptions = cloneDeep(connectionOptions)
+
+        if (logOptions.auth) {
+            logOptions.auth = {
+                username: '********',
+                password: '********',
+            }
+        }
+
+        return logOptions
+    }
+
+    private async connectToMongoose(type: DbType, connectionString: string, connectionOptions: mongoose.ConnectOptions): mongoose.Connection  {
+        let connection: mongoose.Connection
+
+        if (type === DbType.Main) {
+            await mongoose.connect(connectionString, connectionOptions)
+            connection = mongoose.connection
+        } else {
+            connection = await mongoose.createConnection(connectionString, connectionOptions).asPromise()
+        }
+
+        return connection
     }
 }
