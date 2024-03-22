@@ -56,7 +56,9 @@
         "@types/node": "20.9.0",
         "@types/recursive-readdir": "2.2.4",
         "dotenv-flow": "4.0.1",
-        "protobufjs": "7.2.5"
+        "protobufjs": "7.2.5",
+        "type-fest": "^4.8.1",
+        "typescript": "5.3.3"
     },
     "jest": {
         "preset": "@diia-inhouse/configs/dist/jest"
