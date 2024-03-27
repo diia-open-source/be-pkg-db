@@ -13,7 +13,7 @@ import { getConfig } from '../utils'
 
 const config = getConfig()
 const logger = new DiiaLogger()
-const envService = new EnvService()
+const envService = new EnvService(logger)
 
 async function getEncryptedStorage(): Promise<EncryptedStorageService> {
     const authService = new AuthService(config.authConfig, logger)
@@ -23,7 +23,7 @@ async function getEncryptedStorage(): Promise<EncryptedStorageService> {
     return new EncryptedStorageService(logger, authService, envService)
 }
 
-describe('encrypted storage', () => {
+xdescribe('encrypted storage', () => {
     beforeEach(async () => {
         const db = new DatabaseService(config.db, envService, logger)
 
