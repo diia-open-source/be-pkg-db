@@ -6,10 +6,12 @@ import { EnvService } from '@diia-inhouse/env'
 import { AppDbConfig, DbType, ReplicaSetNodeConfig } from '../src/interfaces'
 
 import { TestConfig } from './interfaces/config'
+import DiiaLogger from '@diia-inhouse/diia-logger'
 
 config({ silent: true })
 
-const envService = new EnvService()
+const logger = new DiiaLogger()
+const envService = new EnvService(logger)
 
 export function getConfig(): TestConfig {
     const db: AppDbConfig = {
