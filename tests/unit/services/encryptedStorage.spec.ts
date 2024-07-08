@@ -12,7 +12,7 @@ const utilsMock = {
 jest.mock('@diia-inhouse/utils', () => ({ utils: utilsMock }))
 jest.mock('../../../src/models/encryptedStorage', () => encryptedStorageModelMock)
 
-import { ObjectId } from 'bson'
+import { QueryOptions, Types, mongo } from 'mongoose'
 
 import { AuthService } from '@diia-inhouse/crypto'
 import Logger from '@diia-inhouse/diia-logger'
@@ -59,7 +59,7 @@ describe('EncryptedStorageService', () => {
 
     describe('method: `get`', () => {
         it('should successfully get data from encrypted storage', async () => {
-            const id = new ObjectId(generateIdentifier())
+            const id = new Types.ObjectId(generateIdentifier())
             const expectedData = '{}'
             const encodedData = Buffer.from(Buffer.from(expectedData).toString('base64'), 'base64').toString()
 
@@ -68,7 +68,23 @@ describe('EncryptedStorageService', () => {
             utilsMock.decodeObjectFromBase64.mockResolvedValueOnce(expectedData)
 
             expect(await encryptedStorageService.get(id)).toEqual(expectedData)
-            expect(encryptedStorageModelMock.findById).toHaveBeenCalledWith(id)
+            expect(encryptedStorageModelMock.findById).toHaveBeenCalledWith(id, undefined, {})
+            expect(auth.decryptJWE).toHaveBeenCalledWith(encodedData)
+            expect(utilsMock.decodeObjectFromBase64).toHaveBeenCalledWith(encodedData)
+        })
+
+        it('should successfully get data from encrypted storage with options', async () => {
+            const id = new Types.ObjectId(generateIdentifier())
+            const expectedData = '{}'
+            const encodedData = Buffer.from(Buffer.from(expectedData).toString('base64'), 'base64').toString()
+            const queryOptions: QueryOptions = { readPreference: mongo.ReadPreferenceMode.primaryPreferred }
+
+            encryptedStorageModelMock.findById.mockResolvedValueOnce({ data: encodedData })
+            jest.spyOn(auth, 'decryptJWE').mockResolvedValueOnce(encodedData)
+            utilsMock.decodeObjectFromBase64.mockResolvedValueOnce(expectedData)
+
+            expect(await encryptedStorageService.get(id, queryOptions)).toEqual(expectedData)
+            expect(encryptedStorageModelMock.findById).toHaveBeenCalledWith(id, undefined, queryOptions)
             expect(auth.decryptJWE).toHaveBeenCalledWith(encodedData)
             expect(utilsMock.decodeObjectFromBase64).toHaveBeenCalledWith(encodedData)
         })
@@ -76,7 +92,7 @@ describe('EncryptedStorageService', () => {
 
     describe('method: `getSafe`', () => {
         it('should safely get data from encrypted storage', async () => {
-            const id = new ObjectId(generateIdentifier())
+            const id = new Types.ObjectId(generateIdentifier())
             const expectedData = '{}'
             const encodedData = Buffer.from(Buffer.from(expectedData).toString('base64'), 'base64').toString()
 
@@ -85,19 +101,19 @@ describe('EncryptedStorageService', () => {
             utilsMock.decodeObjectFromBase64.mockResolvedValueOnce(expectedData)
 
             expect(await encryptedStorageService.getSafe(id)).toEqual(expectedData)
-            expect(encryptedStorageModelMock.findById).toHaveBeenCalledWith(id)
+            expect(encryptedStorageModelMock.findById).toHaveBeenCalledWith(id, undefined, {})
             expect(auth.decryptJWE).toHaveBeenCalledWith(encodedData)
             expect(utilsMock.decodeObjectFromBase64).toHaveBeenCalledWith(encodedData)
         })
 
         it('should return undefined instead of throwing error when dat is missing', async () => {
-            const id = new ObjectId(generateIdentifier())
+            const id = new Types.ObjectId(generateIdentifier())
             const expectedError = new NotFoundError('Missing data')
 
             encryptedStorageModelMock.findById.mockResolvedValueOnce(null)
 
             expect(await encryptedStorageService.getSafe(id)).toBeUndefined()
-            expect(encryptedStorageModelMock.findById).toHaveBeenCalledWith(id)
+            expect(encryptedStorageModelMock.findById).toHaveBeenCalledWith(id, undefined, {})
             expect(logger.error).toHaveBeenCalledWith('Encrypted data is not found in storage', { id })
             expect(logger.log).toHaveBeenCalledWith('Unable to retrieve data from encrypted storage', { err: expectedError })
         })
@@ -105,7 +121,7 @@ describe('EncryptedStorageService', () => {
 
     describe('method: `update`', () => {
         it('should successfully update data in encrypted storage', async () => {
-            const id = new ObjectId(generateIdentifier())
+            const id = new Types.ObjectId(generateIdentifier())
             const encodedData = Buffer.from('updated-data').toString('base64')
             const storedData = { save: jest.fn() }
 
@@ -122,7 +138,7 @@ describe('EncryptedStorageService', () => {
 
     describe('method: `remove`', () => {
         it('successfully remove encrypted data from storage', async () => {
-            const id = new ObjectId(generateIdentifier())
+            const id = new Types.ObjectId(generateIdentifier())
             const storedData = { save: jest.fn() }
 
             encryptedStorageModelMock.findOneAndDelete.mockResolvedValueOnce(storedData)
@@ -133,7 +149,7 @@ describe('EncryptedStorageService', () => {
         })
 
         it('should not fail with error in case there is nothing to remove', async () => {
-            const id = new ObjectId(generateIdentifier())
+            const id = new Types.ObjectId(generateIdentifier())
 
             encryptedStorageModelMock.findOneAndDelete.mockResolvedValueOnce(null)
 
@@ -145,7 +161,7 @@ describe('EncryptedStorageService', () => {
 
     describe('method: `deleteMany`', () => {
         it('should successfully delete meny items per request', async () => {
-            const ids = [new ObjectId(generateIdentifier())]
+            const ids = [new Types.ObjectId(generateIdentifier())]
             const res = { deletedCount: 1 }
 
             encryptedStorageModelMock.deleteMany.mockResolvedValueOnce(res)
@@ -157,7 +173,7 @@ describe('EncryptedStorageService', () => {
 
     describe('method: `setExpiration`', () => {
         it('should successfully set expiration', async () => {
-            const id = new ObjectId(generateIdentifier())
+            const id = new Types.ObjectId(generateIdentifier())
             const expiration = 10000
             const storageItem = { save: jest.fn() }
 

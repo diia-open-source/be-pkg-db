@@ -5,6 +5,7 @@ export enum DbConnectionStatus {
     Connected = 'connected',
     Connecting = 'connecting',
     Disconnecting = 'disconnecting',
+    OpFailed = 'op_failed',
 }
 
 export type DbStatusByType = Partial<Record<DbType, DbConnectionStatus>>

@@ -1,4 +1,4 @@
-import { ObjectId } from 'bson'
+import { mongo } from 'mongoose'
 
 import { AuthService } from '@diia-inhouse/crypto'
 import DiiaLogger from '@diia-inhouse/diia-logger'
@@ -13,7 +13,7 @@ import { getConfig } from '../utils'
 
 const config = getConfig()
 const logger = new DiiaLogger()
-const envService = new EnvService()
+const envService = new EnvService(logger)
 
 async function getEncryptedStorage(): Promise<EncryptedStorageService> {
     const authService = new AuthService(config.authConfig, logger)
@@ -83,7 +83,7 @@ describe('encrypted storage', () => {
         })
 
         // Act
-        const resultObjectId = await encryptedStorage.getSafe(new ObjectId())
+        const resultObjectId = await encryptedStorage.getSafe(new mongo.ObjectId())
 
         // Assert
         expect(resultObjectId).toBeUndefined()
@@ -115,6 +115,22 @@ describe('encrypted storage', () => {
             data: expect.any(String),
             expiresAt: new Date(mockDate + DurationMs.Day * 2),
         })
+    })
+
+    it('getExpiration method should return expiration time', async () => {
+        // Arrange
+        const mockDate = Date.now()
+
+        jest.spyOn(global.Date, 'now').mockImplementation(() => mockDate)
+
+        const encryptedStorage = await getEncryptedStorage()
+        const dataId = await encryptedStorage.save({ mockData: true }, DurationMs.Day)
+
+        // Act
+        const expiration = await encryptedStorage.getExpiration(dataId)
+
+        // Assert
+        expect(expiration).toStrictEqual(new Date(mockDate + DurationMs.Day))
     })
 
     it('deleteMany method should delete items', async () => {

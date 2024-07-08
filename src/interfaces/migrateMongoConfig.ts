@@ -1,4 +1,4 @@
-import * as mongo from 'mongodb'
+import { mongo } from 'mongoose'
 
 export interface MigrateMongoConfig {
     mongodb: {

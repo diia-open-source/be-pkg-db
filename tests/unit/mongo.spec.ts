@@ -6,14 +6,12 @@ import { generateIdentifier } from '../mocks/randomData'
 describe('MongoHelper', () => {
     describe('method: `buildMongoUrl`', () => {
         it('should successfully build mongo url', () => {
-            process.env.MONGO_USER = 'user'
-            process.env.MONGO_PASSWORD = 'password'
             process.env.MONGO_HOST = 'mongo.host'
             process.env.MONGO_PORT = '27017'
             process.env.MONGO_AUTH_SOURCE = 'admin'
             process.env.MONGO_REPLICA_SET = 'rs0'
 
-            expect(MongoHelper.buildMongoUrl()).toBe('mongodb://user:password@mongo.host:27017/admin?replicaSet=rs0')
+            expect(MongoHelper.buildMongoUrl('user', 'password')).toBe('mongodb://user:password@mongo.host:27017/admin?replicaSet=rs0')
         })
     })
 

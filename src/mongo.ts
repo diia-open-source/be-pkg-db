@@ -1,24 +1,34 @@
+import DiiaLogger from '@diia-inhouse/diia-logger'
+import { EnvService } from '@diia-inhouse/env'
 import { DatabaseError, UnprocessableEntityError } from '@diia-inhouse/errors'
 
 import { MigrateMongoConfig, MongoDBErrorCode } from './interfaces'
 
-export class MongoHelper {
-    static migrateMongoConfig: MigrateMongoConfig = {
-        mongodb: {
-            url: this.buildMongoUrl(),
-            databaseName: `${process.env.MONGO_DATABASE}`,
-        },
-        migrationsDir: 'migrations',
-        changelogCollectionName: 'migrations',
-        migrationFileExtension: '.ts',
-        useFileHash: false,
-        moduleSystem: 'commonjs',
-    }
+export const MongoHelper = {
+    async getMigrateMongoConfig(): Promise<MigrateMongoConfig> {
+        const envService = new EnvService(new DiiaLogger())
 
-    static buildMongoUrl(): string {
+        await envService.init()
+        const user = await envService.getSecret('MONGO_USER', { accessor: 'username', nullable: true })
+        const password = await envService.getSecret('MONGO_PASSWORD', { accessor: 'password', nullable: true })
+
+        return {
+            mongodb: {
+                url: this.buildMongoUrl(user, password),
+                databaseName: `${process.env.MONGO_DATABASE}`,
+            },
+            migrationsDir: 'migrations',
+            changelogCollectionName: 'migrations',
+            migrationFileExtension: '.ts',
+            useFileHash: false,
+            moduleSystem: 'commonjs',
+        }
+    },
+
+    buildMongoUrl(user: string | null, password: string | null): string {
         let mongoUrl = 'mongodb://'
-        if (process.env.MONGO_USER && process.env.MONGO_PASSWORD) {
-            mongoUrl += `${process.env.MONGO_USER}:${process.env.MONGO_PASSWORD}@`
+        if (user && password) {
+            mongoUrl += `${user}:${password}@`
         }
 
         mongoUrl += `${process.env.MONGO_HOST}:${process.env.MONGO_PORT}/`
@@ -32,20 +42,20 @@ export class MongoHelper {
         }
 
         return mongoUrl
-    }
+    },
 
-    static getMongoErrorDupField(msg: string, fields: string[]): string | undefined {
+    getMongoErrorDupField(msg: string, fields: string[]): string | undefined {
         // eslint-disable-next-line no-restricted-syntax
         for (const field of fields) {
-            const fieldRegExp = RegExp(`${field}_[0-9] dup key`)
+            const fieldRegExp = new RegExp(`${field}_[0-9] dup key`)
 
             if (fieldRegExp.test(msg)) {
                 return field
             }
         }
-    }
+    },
 
-    static handleMongoUniqError(
+    handleMongoUniqError(
         err: Error & { code?: number },
         params: Record<string, unknown>,
         uniqFieldNames: string[],
@@ -67,5 +77,5 @@ export class MongoHelper {
         }
 
         throw new DatabaseError(err.toString())
-    }
+    },
 }

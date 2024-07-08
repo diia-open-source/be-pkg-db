@@ -1,3 +1,5 @@
+export * from 'mongoose'
+
 export * from './dbConfig'
 
 export * from './errors'

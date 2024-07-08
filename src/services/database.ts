@@ -1,5 +1,5 @@
-import fs from 'fs'
-import { resolve } from 'path'
+import fs from 'node:fs'
+import path from 'node:path'
 
 import { cloneDeep } from 'lodash'
 import mongoose, { ClientSession } from 'mongoose'
@@ -33,8 +33,10 @@ export class DatabaseService implements OnInit, OnHealthCheck {
     async onInit(): Promise<void> {
         const tasks = Object.entries(this.dbConfigs).map(async ([type, config]) => {
             const dbType = <DbType>type
-
-            this.db[dbType] = await this.createDbConnection(dbType, config)
+            const connection = await this.createDbConnection(dbType, config)
+            if (connection) {
+                this.db[dbType] = connection
+            }
         })
 
         await Promise.all(tasks)
@@ -49,6 +51,22 @@ export class DatabaseService implements OnInit, OnHealthCheck {
         const dbStatus: DbStatusByType = {}
         for (const [type, db] of Object.entries(this.db)) {
             const dbType = <DbType>type
+
+            try {
+                await db.connection.db
+                    .listCollections(
+                        {},
+                        {
+                            nameOnly: true,
+                            authorizedCollections: true,
+                        },
+                    )
+                    .toArray()
+            } catch (err) {
+                this.logger.error('Mongo list collections error', { err, dbType })
+                dbStatus[dbType] = DbConnectionStatus.OpFailed
+                continue
+            }
 
             dbStatus[dbType] = this.dbStateCodeToName[db.connection.readyState]
         }
@@ -118,7 +136,7 @@ export class DatabaseService implements OnInit, OnHealthCheck {
                 query.push(`readPreference=${readPreference}`)
             }
 
-            if (query.length) {
+            if (query.length > 0) {
                 connectionString += `?${query.join('&')}`
             }
 
@@ -175,7 +193,7 @@ export class DatabaseService implements OnInit, OnHealthCheck {
             const tasks = []
             for (const fileName of files) {
                 // eslint-disable-next-line @typescript-eslint/no-var-requires
-                const modelModule = require(resolve(fileName))
+                const modelModule = require(path.resolve(fileName))
                 if (modelModule.skipSyncIndexes) {
                     continue
                 }
@@ -194,7 +212,7 @@ export class DatabaseService implements OnInit, OnHealthCheck {
         } finally {
             if (exitAfterSync) {
                 this.logger.info('Process exit after synced indexes')
-                // eslint-disable-next-line no-process-exit
+                // eslint-disable-next-line no-process-exit, unicorn/no-process-exit, n/no-process-exit
                 process.exit(0)
             }
         }

@@ -44,7 +44,7 @@ import { DatabaseError } from '@diia-inhouse/errors'
 import { mockInstance } from '@diia-inhouse/test'
 import { HttpStatusCode } from '@diia-inhouse/types'
 
-import { AppDb, AppDbConfig, DatabaseService, DbType } from '../../../src'
+import { AppDb, AppDbConfig, DatabaseService, DbConnectionStatus, DbType } from '../../../src'
 import { config } from '../../mocks/services/database'
 
 describe('DatabaseService', () => {
@@ -79,9 +79,12 @@ describe('DatabaseService', () => {
         it('should return service unavailable status', async () => {
             const databaseService = new DatabaseService(config, envService, logger)
 
-            jest.spyOn(databaseService, 'createDbConnection').mockResolvedValue(<AppDb>(
-                (<unknown>{ connection: { readyState: mongooseMock.ConnectionStates.connecting } })
-            ))
+            jest.spyOn(databaseService, 'createDbConnection').mockResolvedValue(<AppDb>(<unknown>{
+                connection: {
+                    readyState: mongooseMock.ConnectionStates.connecting,
+                    db: { listCollections: jest.fn().mockReturnValue({ toArray: jest.fn().mockResolvedValue([]) }) },
+                },
+            }))
             jest.spyOn(databaseService, 'syncIndexes').mockResolvedValue()
 
             await databaseService.onInit()
@@ -97,12 +100,39 @@ describe('DatabaseService', () => {
             })
         })
 
+        it('should return op failed status', async () => {
+            const databaseService = new DatabaseService(config, envService, logger)
+
+            jest.spyOn(databaseService, 'createDbConnection').mockResolvedValue(<AppDb>(<unknown>{
+                connection: {
+                    readyState: mongooseMock.ConnectionStates.connected,
+                    db: { listCollections: jest.fn().mockReturnValue({ toArray: jest.fn().mockRejectedValue('Auth error') }) },
+                },
+            }))
+            jest.spyOn(databaseService, 'syncIndexes').mockResolvedValue()
+
+            await databaseService.onInit()
+
+            expect(await databaseService.onHealthCheck()).toEqual({
+                status: HttpStatusCode.SERVICE_UNAVAILABLE,
+                details: {
+                    mongodb: {
+                        [DbType.Main]: DbConnectionStatus.OpFailed,
+                        [DbType.Cache]: DbConnectionStatus.OpFailed,
+                    },
+                },
+            })
+        })
+
         it('should return service ok status', async () => {
             const databaseService = new DatabaseService(config, envService, logger)
 
-            jest.spyOn(databaseService, 'createDbConnection').mockResolvedValue(<AppDb>(
-                (<unknown>{ connection: { readyState: mongooseMock.ConnectionStates.connected } })
-            ))
+            jest.spyOn(databaseService, 'createDbConnection').mockResolvedValue(<AppDb>(<unknown>{
+                connection: {
+                    readyState: mongooseMock.ConnectionStates.connected,
+                    db: { listCollections: jest.fn().mockReturnValue({ toArray: jest.fn().mockResolvedValue([]) }) },
+                },
+            }))
             jest.spyOn(databaseService, 'syncIndexes').mockResolvedValue()
 
             await databaseService.onInit()
