@@ -37,8 +37,18 @@ export const MongoHelper = {
             mongoUrl += process.env.MONGO_AUTH_SOURCE
         }
 
+        const query: string[] = []
+
         if (process.env.MONGO_REPLICA_SET) {
-            mongoUrl += `?replicaSet=${process.env.MONGO_REPLICA_SET}`
+            query.push(`replicaSet=${process.env.MONGO_REPLICA_SET}`)
+        }
+
+        if (process.env.MONGO_AUTH_MECHANISM) {
+            query.push(`authMechanism=${process.env.MONGO_AUTH_MECHANISM}`)
+        }
+
+        if (query.length > 0) {
+            mongoUrl += `?${query.join('&')}`
         }
 
         return mongoUrl

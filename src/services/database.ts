@@ -90,7 +90,7 @@ export class DatabaseService implements OnInit, OnHealthCheck {
         }
 
         try {
-            const { host, port, database, authSource, user, password, replicaSet, replicaSetNodes, readPreference } = config
+            const { host, port, database, authSource, user, password, replicaSet, replicaSetNodes, readPreference, authMechanism } = config
 
             const connectionOptions: mongoose.ConnectOptions = {}
             let hosts: string[] = []
@@ -134,6 +134,10 @@ export class DatabaseService implements OnInit, OnHealthCheck {
 
             if (readPreference) {
                 query.push(`readPreference=${readPreference}`)
+            }
+
+            if (authMechanism) {
+                query.push(`authMechanism=${authMechanism}`)
             }
 
             if (query.length > 0) {

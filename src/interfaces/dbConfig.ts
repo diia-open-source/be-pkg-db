@@ -1,4 +1,4 @@
-import mongoose from 'mongoose'
+import mongoose, { mongo } from 'mongoose'
 
 export interface ReplicaSetNodeConfig {
     replicaHost: string
@@ -21,6 +21,7 @@ export interface AppDbConfig {
     replicaSetNodes?: ReplicaSetNodeConfig[]
     readPreference?: string
     indexes?: { sync: boolean; exitAfterSync: boolean }
+    authMechanism?: mongo.AuthMechanism
 }
 
 export interface AppDb {
