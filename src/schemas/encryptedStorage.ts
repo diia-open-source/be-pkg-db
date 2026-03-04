@@ -1,4 +1,4 @@
-import { Model, Schema, model, models } from 'mongoose'
+import { Schema } from 'mongoose'
 
 import { DurationS } from '@diia-inhouse/types'
 
@@ -17,4 +17,4 @@ const encryptedStorageSchema = new Schema<EncryptedStorage>(
 
 encryptedStorageSchema.index({ expiresAt: 1 }, { expireAfterSeconds: DurationS.Day })
 
-export default <Model<EncryptedStorage>>models.EncryptedStorage || model('EncryptedStorage', encryptedStorageSchema)
+export { encryptedStorageSchema }

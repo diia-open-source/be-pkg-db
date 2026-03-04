@@ -13,15 +13,22 @@ export interface AppDbConfig {
     isEnabled?: boolean
     user?: string
     password?: string
-    database?: string
+    database: string
     authSource?: string
     host?: string
     port?: number
     replicaSet?: string
     replicaSetNodes?: ReplicaSetNodeConfig[]
     readPreference?: string
-    indexes?: { sync: boolean; exitAfterSync: boolean }
     authMechanism?: mongo.AuthMechanism
+    metrics: {
+        enabled: boolean
+        buckets?: number[]
+    }
+}
+
+export interface PostgresDbConfig {
+    url: string
 }
 
 export interface AppDb {

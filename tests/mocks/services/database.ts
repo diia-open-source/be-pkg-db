@@ -2,10 +2,6 @@ import { AppDbConfig, DbType } from '../../../src/interfaces/dbConfig'
 
 export const config: Record<DbType, AppDbConfig> = {
     [DbType.Main]: {
-        indexes: {
-            exitAfterSync: true,
-            sync: true,
-        },
         isEnabled: true,
         authSource: 'admin',
         database: 'test',
@@ -15,12 +11,11 @@ export const config: Record<DbType, AppDbConfig> = {
         replicaSet: 'rs0',
         replicaSetNodes: [{ replicaHost: 'mongo.replica.test.host' }],
         user: 'user',
+        metrics: {
+            enabled: false,
+        },
     },
     [DbType.Cache]: {
-        indexes: {
-            exitAfterSync: true,
-            sync: false,
-        },
         isEnabled: true,
         authSource: 'admin',
         database: 'cache-test',
@@ -29,5 +24,8 @@ export const config: Record<DbType, AppDbConfig> = {
         readPreference: 'primary',
         replicaSet: 'rs0',
         user: 'user',
+        metrics: {
+            enabled: false,
+        },
     },
 }

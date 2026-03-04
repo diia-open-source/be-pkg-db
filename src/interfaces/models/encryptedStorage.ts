@@ -1,9 +1,6 @@
-import { Document } from 'mongoose'
-
 export interface EncryptedStorage {
+    id?: string
     data: string
     expiresAt: Date
     source?: unknown
 }
-
-export interface EncryptedStorageModel extends EncryptedStorage, Document {}

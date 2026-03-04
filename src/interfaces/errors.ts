@@ -39,4 +39,9 @@ export enum MongoDBErrorCode {
     UnsupportedFormat = 12,
     UserNotFound = 11,
     WriteConcernError = 64,
+    WriteConflict = 112,
 }
+
+export const PostgresErrorCode = {
+    InvalidCredentials: '28P01',
+} as const

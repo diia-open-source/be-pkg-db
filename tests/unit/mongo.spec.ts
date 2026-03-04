@@ -1,4 +1,4 @@
-import { UnprocessableEntityError } from '@diia-inhouse/errors'
+import { DatabaseError, UnprocessableEntityError } from '@diia-inhouse/errors'
 
 import { MongoHelper } from '../../src'
 import { generateIdentifier } from '../mocks/randomData'
@@ -25,10 +25,10 @@ describe('MongoHelper', () => {
         const identifier = generateIdentifier()
 
         it.each([
-            ['regular database', new Error('Unable to fetch'), {}, [], 'user', new Error('Error: Unable to fetch')],
+            ['regular database', new Error('Unable to fetch'), {}, [], 'user', new DatabaseError('Error: Unable to fetch')],
             [
                 'unexpected while entity processing',
-                <Error>{ name: 'MongoError', code: 11000, message: 'Not found' },
+                { name: 'MongoError', code: 11000, message: 'Not found' } as Error,
                 { identifier },
                 ['identifier'],
                 'user',
@@ -36,7 +36,7 @@ describe('MongoHelper', () => {
             ],
             [
                 'already exists',
-                <Error>{ name: 'MongoError', code: 11000, message: 'Field identifier_1 dup key' },
+                { name: 'MongoError', code: 11000, message: 'Field identifier_1 dup key' } as Error,
                 { identifier },
                 ['identifier'],
                 'user',

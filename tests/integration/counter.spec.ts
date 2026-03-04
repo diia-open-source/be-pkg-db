@@ -1,28 +1,51 @@
 import { randomUUID } from 'node:crypto'
 
+import { eq } from 'drizzle-orm'
+import { drizzle } from 'drizzle-orm/node-postgres'
 import { DateTime } from 'luxon'
+import { model } from 'mongoose'
 
 import DiiaLogger from '@diia-inhouse/diia-logger'
 import { EnvService } from '@diia-inhouse/env'
 
-import counterModel from '../../src/models/counter'
+import { DatabaseAdapterType } from '../../src/interfaces/database'
+import { counterSchema } from '../../src/schemas/counter'
 import { CounterService } from '../../src/services/counter'
 import { DatabaseService } from '../../src/services/database'
+import * as schema from '../../src/tables'
 import { getConfig } from '../utils'
 
 const config = getConfig()
 const logger = new DiiaLogger()
 const envService = new EnvService(logger)
+const counterModel = model('Counter', counterSchema)
+const databaseAdapter = process.env.DATABASE_ADAPTER as DatabaseAdapterType
+const postgresDatabase = drizzle(process.env.POSTGRES_DATABASE_URL!, { casing: 'snake_case', schema, logger: true })
 
 function getCounterService(): CounterService {
-    return new CounterService()
+    return new CounterService(databaseAdapter, counterModel, postgresDatabase)
+}
+
+async function updateCounter(code: string): Promise<void> {
+    if (databaseAdapter === 'mongo') {
+        await counterModel.updateOne({ code }, { date: DateTime.now().startOf('day').minus({ days: 1 }).toJSDate() })
+
+        return
+    }
+
+    await postgresDatabase
+        .update(schema.counter)
+        .set({ date: DateTime.now().startOf('day').minus({ days: 1 }).toJSDate() })
+        .where(eq(schema.counter.code, code))
 }
 
 describe('Counter service', () => {
     beforeAll(async () => {
-        const db = new DatabaseService(config.db, envService, logger)
+        if (databaseAdapter === 'mongo') {
+            const db = new DatabaseService('mongo', config.db, envService, logger)
 
-        await db.onInit()
+            await db.onInit()
+        }
     })
 
     const counterName1 = randomUUID()
@@ -47,7 +70,7 @@ describe('Counter service', () => {
         expect(await counterService.getNextDailyValue(counterName3)).toBe(1)
         expect(await counterService.getNextDailyValue(counterName3)).toBe(2)
 
-        await counterModel.updateOne({ code: counterName3 }, { date: DateTime.now().startOf('day').minus({ days: 1 }).toJSDate() })
+        await updateCounter(counterName3)
 
         expect(await counterService.getNextDailyValue(counterName3)).toBe(1)
     })

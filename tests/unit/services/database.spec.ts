@@ -1,91 +1,83 @@
-const schemaStubs = {
-    index: jest.fn(),
-}
-
-class SchemaMock {
-    index(...args: unknown[]): unknown {
-        return schemaStubs.index(...args)
-    }
-}
-const asPromise = jest.fn()
-const connectionMock = {
-    on: jest.fn(),
-}
-const sessionMock = {
-    startTransaction: jest.fn(),
-    abortTransaction: jest.fn(),
-    endSession: jest.fn(),
-}
-const mongooseMock = {
-    set: jest.fn(),
-    connect: jest.fn(),
-    createConnection: jest.fn(),
-    connection: connectionMock,
-    ConnectionStates: {
-        disconnected: 'disconnected',
-        connected: 'connected',
-        connecting: 'connecting',
-        disconnecting: 'disconnecting',
-    },
-    Schema: SchemaMock,
-    models: {},
-    model: jest.fn(),
-    on: jest.fn(),
-    startSession: jest.fn(),
-}
-const recursiveReadMock = jest.fn()
-
-jest.mock('mongoose', () => mongooseMock)
-jest.mock('recursive-readdir', () => recursiveReadMock)
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import mongoose, { ClientSession, Connection } from 'mongoose'
+import { mock } from 'vitest-mock-extended'
 
 import Logger from '@diia-inhouse/diia-logger'
 import { EnvService } from '@diia-inhouse/env'
 import { DatabaseError } from '@diia-inhouse/errors'
-import { mockInstance } from '@diia-inhouse/test'
 import { HttpStatusCode } from '@diia-inhouse/types'
 
 import { AppDb, AppDbConfig, DatabaseService, DbConnectionStatus, DbType } from '../../../src'
 import { config } from '../../mocks/services/database'
 
+vi.mock('mongoose', async (importOriginal) => {
+    const original = await importOriginal<typeof mongoose>()
+
+    return {
+        ...original,
+        default: {
+            ...original.default,
+            set: vi.fn(),
+            connect: vi.fn(),
+            createConnection: vi.fn(),
+            connection: { on: vi.fn(), startSession: vi.fn() },
+            ConnectionStates: {
+                disconnected: 'disconnected',
+                connected: 'connected',
+                connecting: 'connecting',
+                disconnecting: 'disconnecting',
+            },
+            Schema: class SchemaMock {
+                index(...args: unknown[]): unknown {
+                    return { index: vi.fn() }.index(...args)
+                }
+            },
+            models: {},
+            model: vi.fn(),
+            on: vi.fn(),
+            startSession: vi.fn(),
+        },
+    }
+})
+
 describe('DatabaseService', () => {
     const now = Date.now()
-    const logger = mockInstance(Logger)
-    const envService = mockInstance(EnvService)
+    const logger = mock<Logger>()
+    const envService = mock<EnvService>()
 
     beforeEach(() => {
-        jest.useFakeTimers({ now })
+        vi.useFakeTimers({ now })
     })
 
     afterEach(() => {
-        jest.useRealTimers()
+        vi.useRealTimers()
     })
 
     describe('method: `onInit`', () => {
         it('shoudl successfully init database connections based on config', async () => {
-            const databaseService = new DatabaseService(config, envService, logger)
+            const databaseService = new DatabaseService('mongo', config, envService, logger)
 
-            jest.spyOn(databaseService, 'createDbConnection').mockResolvedValue(<AppDb>(<unknown>{ connection: mongooseMock }))
-            jest.spyOn(databaseService, 'syncIndexes').mockResolvedValue()
+            vi.spyOn(databaseService, 'createDbConnection').mockResolvedValue({
+                connection: vi.mocked(mongoose.connection),
+            } as unknown as AppDb)
 
             await databaseService.onInit()
 
             expect(databaseService.createDbConnection).toHaveBeenCalledWith(DbType.Main, config[DbType.Main])
             expect(databaseService.createDbConnection).toHaveBeenCalledWith(DbType.Cache, config[DbType.Cache])
-            expect(databaseService.syncIndexes).toHaveBeenCalledWith(config[DbType.Main].indexes?.exitAfterSync)
         })
     })
 
     describe('method: `onHealthCheck`', () => {
         it('should return service unavailable status', async () => {
-            const databaseService = new DatabaseService(config, envService, logger)
+            const databaseService = new DatabaseService('mongo', config, envService, logger)
 
-            jest.spyOn(databaseService, 'createDbConnection').mockResolvedValue(<AppDb>(<unknown>{
+            vi.spyOn(databaseService, 'createDbConnection').mockResolvedValue({
                 connection: {
-                    readyState: mongooseMock.ConnectionStates.connecting,
-                    db: { listCollections: jest.fn().mockReturnValue({ toArray: jest.fn().mockResolvedValue([]) }) },
+                    readyState: vi.mocked(mongoose).ConnectionStates.connecting,
+                    db: { listCollections: vi.fn().mockReturnValue({ toArray: vi.fn().mockResolvedValue([]) }) },
                 },
-            }))
-            jest.spyOn(databaseService, 'syncIndexes').mockResolvedValue()
+            } as unknown as AppDb)
 
             await databaseService.onInit()
 
@@ -93,23 +85,22 @@ describe('DatabaseService', () => {
                 status: HttpStatusCode.SERVICE_UNAVAILABLE,
                 details: {
                     mongodb: {
-                        [DbType.Main]: mongooseMock.ConnectionStates.connecting,
-                        [DbType.Cache]: mongooseMock.ConnectionStates.connecting,
+                        [DbType.Main]: vi.mocked(mongoose).ConnectionStates.connecting,
+                        [DbType.Cache]: vi.mocked(mongoose).ConnectionStates.connecting,
                     },
                 },
             })
         })
 
         it('should return op failed status', async () => {
-            const databaseService = new DatabaseService(config, envService, logger)
+            const databaseService = new DatabaseService('mongo', config, envService, logger)
 
-            jest.spyOn(databaseService, 'createDbConnection').mockResolvedValue(<AppDb>(<unknown>{
+            vi.spyOn(databaseService, 'createDbConnection').mockResolvedValue({
                 connection: {
-                    readyState: mongooseMock.ConnectionStates.connected,
-                    db: { listCollections: jest.fn().mockReturnValue({ toArray: jest.fn().mockRejectedValue('Auth error') }) },
+                    readyState: vi.mocked(mongoose).ConnectionStates.connected,
+                    db: { listCollections: vi.fn().mockReturnValue({ toArray: vi.fn().mockRejectedValue('Auth error') }) },
                 },
-            }))
-            jest.spyOn(databaseService, 'syncIndexes').mockResolvedValue()
+            } as unknown as AppDb)
 
             await databaseService.onInit()
 
@@ -125,15 +116,14 @@ describe('DatabaseService', () => {
         })
 
         it('should return service ok status', async () => {
-            const databaseService = new DatabaseService(config, envService, logger)
+            const databaseService = new DatabaseService('mongo', config, envService, logger)
 
-            jest.spyOn(databaseService, 'createDbConnection').mockResolvedValue(<AppDb>(<unknown>{
+            vi.spyOn(databaseService, 'createDbConnection').mockResolvedValue({
                 connection: {
-                    readyState: mongooseMock.ConnectionStates.connected,
-                    db: { listCollections: jest.fn().mockReturnValue({ toArray: jest.fn().mockResolvedValue([]) }) },
+                    readyState: vi.mocked(mongoose).ConnectionStates.connected,
+                    db: { listCollections: vi.fn().mockReturnValue({ toArray: vi.fn().mockResolvedValue([]) }) },
                 },
-            }))
-            jest.spyOn(databaseService, 'syncIndexes').mockResolvedValue()
+            } as unknown as AppDb)
 
             await databaseService.onInit()
 
@@ -141,8 +131,8 @@ describe('DatabaseService', () => {
                 status: HttpStatusCode.OK,
                 details: {
                     mongodb: {
-                        [DbType.Main]: mongooseMock.ConnectionStates.connected,
-                        [DbType.Cache]: mongooseMock.ConnectionStates.connected,
+                        [DbType.Main]: vi.mocked(mongoose).ConnectionStates.connected,
+                        [DbType.Cache]: vi.mocked(mongoose).ConnectionStates.connected,
                     },
                 },
             })
@@ -150,10 +140,10 @@ describe('DatabaseService', () => {
     })
 
     describe('method: `createDbConnection`', () => {
-        const databaseService = new DatabaseService(config, envService, logger)
+        const databaseService = new DatabaseService('mongo', config, envService, logger)
 
         it('should skip db connection creation in case database is disabled', async () => {
-            await databaseService.createDbConnection(DbType.Main, { isEnabled: false })
+            await databaseService.createDbConnection(DbType.Main, { isEnabled: false, database: '', metrics: { enabled: false } })
 
             expect(logger.info).toHaveBeenCalledWith(`Database is disabled: ${DbType.Main}`)
         })
@@ -164,7 +154,7 @@ describe('DatabaseService', () => {
                 DbType.Cache,
                 config[DbType.Cache],
                 {
-                    connection: mongooseMock,
+                    connection: vi.mocked(mongoose.connection),
                     connectionOptions: { auth: { password: 'password', username: 'user' }, dbName: 'cache-test', replicaSet: 'rs0' },
                     connectionString: 'mongodb://mongo.cache.test.host/?authSource=admin&readPreference=primary',
                 },
@@ -175,7 +165,7 @@ describe('DatabaseService', () => {
                 DbType.Cache,
                 { ...config[DbType.Cache], port: 27017 },
                 {
-                    connection: mongooseMock,
+                    connection: vi.mocked(mongoose.connection),
                     connectionOptions: { auth: { password: 'password', username: 'user' }, dbName: 'cache-test', replicaSet: 'rs0' },
                     connectionString: 'mongodb://mongo.cache.test.host:27017/?authSource=admin&readPreference=primary',
                 },
@@ -186,7 +176,7 @@ describe('DatabaseService', () => {
                 DbType.Main,
                 config[DbType.Main],
                 {
-                    connection: connectionMock,
+                    connection: vi.mocked(mongoose.connection),
                     connectionOptions: { auth: { password: 'password', username: 'user' }, dbName: 'test', replicaSet: 'rs0' },
                     connectionString: 'mongodb://mongo.replica.test.host:27017/?authSource=admin&readPreference=primary',
                 },
@@ -195,13 +185,16 @@ describe('DatabaseService', () => {
         ])(
             'should successfully create connection when %s',
             async (_msg, type: DbType, inputConfig: AppDbConfig, expectedConnection, expectedLogOptions) => {
-                jest.spyOn(envService, 'isTest').mockReturnValue(true)
-                mongooseMock.set.mockImplementationOnce((_logType, logCaller) => {
+                envService.isTest.mockReturnValue(true)
+                ;(vi.mocked(mongoose.set) as any).mockImplementationOnce((_logType: any, logCaller: any): any => {
                     logCaller('coll', 'set', 'db-query', 'doc', {})
                 })
-                mongooseMock.createConnection.mockReturnValue({ asPromise })
-                asPromise.mockResolvedValue(mongooseMock)
-                connectionMock.on.mockImplementationOnce((_evenType, cb) => {
+                const asPromise = vi.fn()
+
+                vi.mocked(mongoose.createConnection).mockReturnValue({ asPromise } as unknown as Connection)
+
+                asPromise.mockResolvedValue(vi.mocked(mongoose.connection))
+                ;(vi.mocked(mongoose.connection).on as any).mockImplementationOnce((_evenType: any, cb: any) => {
                     cb(null)
                 })
 
@@ -224,9 +217,9 @@ describe('DatabaseService', () => {
         it('should fail to create connection in case host and replica set node are provided at the same time', async () => {
             const expectedError = new DatabaseError('Failed to connect to Database')
 
-            await expect(async () => {
-                await databaseService.createDbConnection(DbType.Main, { ...config[DbType.Main], host: 'mongo.test.host' })
-            }).rejects.toEqual(expectedError)
+            await expect(
+                databaseService.createDbConnection(DbType.Main, { ...config[DbType.Main], host: 'mongo.test.host' }),
+            ).rejects.toEqual(expectedError)
             expect(logger.error).toHaveBeenCalledWith(
                 'Wrong database configuration:',
                 'Must be only `host` and `port` or `replicaSetNodes` config',
@@ -238,78 +231,56 @@ describe('DatabaseService', () => {
         })
     })
 
-    describe('method: `syncIndexes`', () => {
-        it('should successfully run sync indexes', async () => {
-            const databaseService = new DatabaseService(config, envService, logger)
-
-            recursiveReadMock.mockResolvedValue([
-                `${__dirname}../../../mocks/models/user.js`,
-                `${__dirname}../../../mocks/models/profile.js`,
-            ])
-            jest.spyOn(process, 'exit').mockReturnValue(<never>'ok')
-
-            await databaseService.syncIndexes(true, 'models')
-
-            expect(recursiveReadMock).toHaveBeenCalledWith('./dist/models', ['*.map', 'index.js', 'schemas'])
-            expect(logger.info).toHaveBeenCalledWith(`Ended syncing indexes in 0 ms`)
-        })
-
-        it('should fail to run sync indexes in case recursive read is failed', async () => {
-            const expectedError = new Error('Unable to read list of files')
-            const databaseService = new DatabaseService(config, envService, logger)
-
-            recursiveReadMock.mockRejectedValue(expectedError)
-
-            await expect(async () => {
-                await databaseService.syncIndexes()
-            }).rejects.toEqual(expectedError)
-
-            expect(recursiveReadMock).toHaveBeenCalledWith('./dist/models', ['*.map', 'index.js', 'schemas'])
-            expect(logger.error).toHaveBeenCalledWith('Failed to syncing indexes', { err: expectedError })
-        })
-    })
-
     describe('method: `beginTransaction`', () => {
         it('should fail to begin transaction is case there is no connection', async () => {
-            const databaseService = new DatabaseService(config, envService, logger)
+            const databaseService = new DatabaseService('mongo', config, envService, logger)
 
-            await expect(async () => {
-                await databaseService.beginTransaction(DbType.Main)
-            }).rejects.toEqual(new DatabaseError('Connection is undefined'))
+            await expect(databaseService.beginTransaction(DbType.Main)).rejects.toEqual(new DatabaseError('Connection is undefined'))
         })
 
         it('should fail to begin transaction in case error is occurred when starting transaction session', async () => {
             const expectedError = new Error('Unable to start transaction')
-            const databaseService = new DatabaseService(config, envService, logger)
+            const databaseService = new DatabaseService('mongo', config, envService, logger)
+            const sessionMock = {
+                startTransaction: vi.fn(),
+                abortTransaction: vi.fn(),
+                endSession: vi.fn(),
+            }
 
-            jest.spyOn(databaseService, 'createDbConnection').mockResolvedValue(<AppDb>(<unknown>{ connection: mongooseMock }))
-            jest.spyOn(databaseService, 'syncIndexes').mockResolvedValue()
-            mongooseMock.startSession.mockResolvedValue(sessionMock)
-            sessionMock.abortTransaction.mockResolvedValueOnce(null)
-            sessionMock.endSession.mockResolvedValueOnce(null)
-            sessionMock.startTransaction.mockImplementationOnce(() => {
+            vi.spyOn(databaseService, 'createDbConnection').mockResolvedValue({
+                connection: vi.mocked(mongoose.connection),
+            } as unknown as AppDb)
+            vi.mocked(mongoose.connection.startSession).mockResolvedValue(sessionMock as unknown as ClientSession)
+            vi.mocked(sessionMock.abortTransaction).mockResolvedValueOnce(null)
+            vi.mocked(sessionMock.endSession).mockResolvedValueOnce(null)
+            vi.mocked(sessionMock.startTransaction).mockImplementationOnce(() => {
                 throw expectedError
             })
 
             await databaseService.onInit()
 
-            await expect(async () => {
-                await databaseService.beginTransaction()
-            }).rejects.toEqual(new DatabaseError('Unable to begin transaction', { err: expectedError }))
+            await expect(databaseService.beginTransaction()).rejects.toEqual(
+                new DatabaseError('Unable to begin transaction', { err: expectedError }),
+            )
         })
 
         it('should successfully begin transaction', async () => {
-            const databaseService = new DatabaseService(config, envService, logger)
+            const databaseService = new DatabaseService('mongo', config, envService, logger)
+            const sessionMock = {
+                startTransaction: vi.fn(),
+                abortTransaction: vi.fn(),
+                endSession: vi.fn(),
+            }
 
-            jest.spyOn(databaseService, 'createDbConnection').mockResolvedValue(<AppDb>(<unknown>{ connection: mongooseMock }))
-            jest.spyOn(databaseService, 'syncIndexes').mockResolvedValue()
-            mongooseMock.startSession.mockResolvedValue(sessionMock)
-            sessionMock.abortTransaction.mockResolvedValueOnce(null)
-            sessionMock.endSession.mockResolvedValueOnce(null)
-            sessionMock.startTransaction.mockResolvedValueOnce(sessionMock)
+            vi.spyOn(databaseService, 'createDbConnection').mockResolvedValue({
+                connection: vi.mocked(mongoose.connection),
+            } as unknown as AppDb)
+            vi.mocked(mongoose.connection.startSession).mockResolvedValue(sessionMock as unknown as ClientSession)
+            vi.mocked(sessionMock.abortTransaction).mockResolvedValueOnce(null)
+            vi.mocked(sessionMock.endSession).mockResolvedValueOnce(null)
+            vi.mocked(sessionMock.startTransaction).mockResolvedValueOnce(sessionMock)
 
             await databaseService.onInit()
-
             expect(await databaseService.beginTransaction()).toEqual(sessionMock)
         })
     })

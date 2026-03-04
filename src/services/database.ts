@@ -1,17 +1,41 @@
-import fs from 'node:fs'
-import path from 'node:path'
-
 import { cloneDeep } from 'lodash'
 import mongoose, { ClientSession } from 'mongoose'
-import recursiveRead from 'recursive-readdir'
 
+import { Histogram, Observer } from '@diia-inhouse/diia-metrics'
 import { EnvService } from '@diia-inhouse/env'
 import { DatabaseError } from '@diia-inhouse/errors'
-import { HealthCheckResult, HttpStatusCode, Logger, OnHealthCheck, OnInit } from '@diia-inhouse/types'
+import { HealthCheckResult, HttpStatusCode, Logger, OnDestroy, OnHealthCheck, OnInit } from '@diia-inhouse/types'
 
-import { AppDb, AppDbConfig, DbConnectionStatus, DbStatusByType, DbType, MongoDbStatus } from '../interfaces'
+import {
+    AppDb,
+    AppDbConfig,
+    DatabaseAdapterType,
+    DbConnectionStatus,
+    DbOpLog,
+    DbStatusByType,
+    DbType,
+    MongoDbStatus,
+    MongodbOperationResult,
+    MongodbOperationsLabelsMap,
+    mongodbOperationsAllowedFields,
+    mongodbOperationsDefaultBuckets,
+} from '../interfaces'
 
-export class DatabaseService implements OnInit, OnHealthCheck {
+export class DatabaseService implements OnInit, OnHealthCheck, OnDestroy {
+    readonly defaultModelsDir = 'models'
+
+    db: Partial<Record<DbType, AppDb>> = {}
+
+    dbOperationsHistogram?: Histogram<MongodbOperationsLabelsMap>
+
+    dbOplogObserver?: Observer<object>
+
+    observerInterval: NodeJS.Timeout | undefined
+
+    private dbOplog: DbOpLog = {}
+
+    private readonly isMonitoringEnabled: boolean = false
+
     private readonly dbStateCodeToName: Partial<Record<mongoose.ConnectionStates, DbConnectionStatus>> = {
         [mongoose.ConnectionStates.disconnected]: DbConnectionStatus.Disconnected,
         [mongoose.ConnectionStates.connected]: DbConnectionStatus.Connected,
@@ -19,20 +43,43 @@ export class DatabaseService implements OnInit, OnHealthCheck {
         [mongoose.ConnectionStates.disconnecting]: DbConnectionStatus.Disconnecting,
     }
 
-    readonly defaultModelsDir = 'models'
-
-    db: Partial<Record<DbType, AppDb>> = {}
+    /**
+     * https://www.mongodb.com/docs/manual/core/transactions/#read-concern-write-concern-read-preference
+     */
+    private readonly defaultTransactionOptions: mongoose.mongo.TransactionOptions = {
+        readPreference: 'primary',
+    }
 
     constructor(
-        private readonly dbConfigs: Record<DbType, AppDbConfig>,
+        private readonly databaseAdapter: DatabaseAdapterType,
+        private readonly dbConfigs: Partial<Record<DbType, AppDbConfig>>,
 
         private readonly envService: EnvService,
         private readonly logger: Logger,
-    ) {}
+    ) {
+        this.isMonitoringEnabled = this.dbConfigs.main?.metrics.enabled || false
+        if (this.isMonitoringEnabled) {
+            this.dbOperationsHistogram = new Histogram<MongodbOperationsLabelsMap>(
+                'diia_mongodb_operation_seconds',
+                mongodbOperationsAllowedFields,
+                'Mongodb operation duration in seconds',
+                this.dbConfigs.main?.metrics.buckets || mongodbOperationsDefaultBuckets,
+            )
+            this.dbOplogObserver = new Observer<object>(
+                'diia_mongodb_oplog_cache_size',
+                [],
+                'Amount of operations stored in in-memory cache for monitoring',
+            )
+        }
+    }
 
     async onInit(): Promise<void> {
+        if (this.databaseAdapter !== 'mongo') {
+            return
+        }
+
         const tasks = Object.entries(this.dbConfigs).map(async ([type, config]) => {
-            const dbType = <DbType>type
+            const dbType = type as DbType
             const connection = await this.createDbConnection(dbType, config)
             if (connection) {
                 this.db[dbType] = connection
@@ -41,20 +88,31 @@ export class DatabaseService implements OnInit, OnHealthCheck {
 
         await Promise.all(tasks)
 
-        const mainConfig = this.dbConfigs[DbType.Main]
-        if (mainConfig?.indexes?.sync) {
-            await this.syncIndexes(mainConfig.indexes.exitAfterSync)
+        if (this.isMonitoringEnabled) {
+            this.observerInterval = setInterval(() => {
+                this.oplogObserver()
+            }, 5000)
+        }
+    }
+
+    async onDestroy(): Promise<void> {
+        if (this.isMonitoringEnabled) {
+            clearInterval(this.observerInterval)
+        }
+
+        for (const db of Object.values(this.db)) {
+            await db.connection.close()
         }
     }
 
     async onHealthCheck(): Promise<HealthCheckResult<MongoDbStatus>> {
         const dbStatus: DbStatusByType = {}
         for (const [type, db] of Object.entries(this.db)) {
-            const dbType = <DbType>type
+            const dbType = type as DbType
 
             try {
                 await db.connection.db
-                    .listCollections(
+                    ?.listCollections(
                         {},
                         {
                             nameOnly: true,
@@ -162,10 +220,14 @@ export class DatabaseService implements OnInit, OnHealthCheck {
 
             let connection: mongoose.Connection
             if (type === DbType.Main) {
-                await mongoose.connect(connectionString, connectionOptions)
+                await mongoose.connect(connectionString, { ...connectionOptions, monitorCommands: this.isMonitoringEnabled })
                 connection = mongoose.connection
             } else {
                 connection = await mongoose.createConnection(connectionString, connectionOptions).asPromise()
+            }
+
+            if (this.isMonitoringEnabled) {
+                this.connectMonitor(connection)
             }
 
             connection.on('error', (err) => {
@@ -180,50 +242,20 @@ export class DatabaseService implements OnInit, OnHealthCheck {
         }
     }
 
-    async syncIndexes(exitAfterSync = false, modelsDir?: string): Promise<void> {
-        const modelsPath = `./dist/${modelsDir || this.defaultModelsDir}`
-
-        try {
-            if (!fs.existsSync(modelsPath)) {
-                this.logger.info('Models dir is absent, indexes sync skipped')
-
-                return
-            }
-
-            const t0 = Date.now()
-
-            this.logger.info('Start syncing indexes')
-            const files = await recursiveRead(modelsPath, ['*.map', 'index.js', 'schemas'])
-            const tasks = []
-            for (const fileName of files) {
-                // eslint-disable-next-line @typescript-eslint/no-var-requires
-                const modelModule = require(path.resolve(fileName))
-                if (modelModule.skipSyncIndexes) {
-                    continue
-                }
-
-                const task = modelModule.default
-
-                tasks.push(this.syncModel(task))
-            }
-
-            await Promise.all(tasks)
-            this.logger.info(`Ended syncing indexes in ${Date.now() - t0} ms`)
-            this.logger.info('Successfully synced indexes')
-        } catch (err) {
-            this.logger.error('Failed to syncing indexes', { err })
-            throw err
-        } finally {
-            if (exitAfterSync) {
-                this.logger.info('Process exit after synced indexes')
-                // eslint-disable-next-line no-process-exit, unicorn/no-process-exit, n/no-process-exit
-                process.exit(0)
-            }
-        }
-    }
-
-    async beginTransaction(dbType: DbType = DbType.Main): Promise<ClientSession> {
-        const connection = this.db[dbType]?.connection
+    /**
+     * Begins a new MongoDB transaction by starting a session and transaction
+     *
+     * @param options - Optional transaction options to override the default transaction settings
+     * @returns A ClientSession with an active transaction
+     * @throws {DatabaseError} If the database connection is undefined or transaction fails to start
+     *
+     * @remarks
+     * - Uses the main database connection to start the session
+     * - Applies default transaction options (readPreference: primary)
+     * - Will abort transaction and end session if any errors occur during setup
+     */
+    async beginTransaction(options?: mongoose.mongo.TransactionOptions): Promise<ClientSession> {
+        const connection = this.db[DbType.Main]?.connection
 
         if (!connection) {
             throw new DatabaseError('Connection is undefined')
@@ -232,7 +264,12 @@ export class DatabaseService implements OnInit, OnHealthCheck {
         const session = await connection.startSession()
 
         try {
-            session.startTransaction()
+            const transactionOptions: mongoose.mongo.TransactionOptions = {
+                ...this.defaultTransactionOptions,
+                ...options,
+            }
+
+            session.startTransaction(transactionOptions)
 
             return session
         } catch (err) {
@@ -243,11 +280,83 @@ export class DatabaseService implements OnInit, OnHealthCheck {
         }
     }
 
-    private async syncModel(model: mongoose.Model<unknown>): Promise<void> {
-        const t0 = Date.now()
+    private connectMonitor(connection: mongoose.Connection): void {
+        try {
+            const client = connection.getClient()
 
-        this.logger.info(`Start syncing indexes for the ${model.modelName} collection`)
-        await model.syncIndexes()
-        this.logger.info(`Ended syncing indexes for the ${model.modelName} collection in ${Date.now() - t0} ms`)
+            client.on('commandStarted', (event) => {
+                const db = event.databaseName
+                const opType = event.commandName
+                const key = `${event.requestId}${event.connectionId}`
+                const parsedCollection = Number.parseInt(event.command[opType] || '', 10)
+                const collection: string | undefined = Number.isNaN(parsedCollection) ? event.command[opType] : undefined
+
+                this.dbOplog[key] = {
+                    database: db,
+                    collection,
+                    opType,
+                }
+
+                this.logger.debug('Mongodb commandStarted operation', {
+                    database: db,
+                    collection,
+                    operation: opType,
+                    command: event.command,
+                })
+            })
+
+            client.on('commandSucceeded', (event) => {
+                const key = `${event.requestId}${event.connectionId}`
+                const oplogEntry = this.dbOplog[key]
+                const durationMs = event.duration
+
+                delete this.dbOplog[key]
+
+                this.logger.debug('Mongodb commandSucceeded operation', {
+                    database: oplogEntry.database,
+                    operation: oplogEntry.opType,
+                    collection: oplogEntry.collection,
+                })
+
+                this.dbOperationsHistogram?.observe(
+                    {
+                        operation: oplogEntry.opType,
+                        status: MongodbOperationResult.Successful,
+                        database: oplogEntry.database,
+                        ...(oplogEntry.collection && { collection: oplogEntry.collection }),
+                    },
+                    durationMs / 1000,
+                )
+            })
+
+            client.on('commandFailed', (event) => {
+                const key = `${event.requestId}${event.connectionId}`
+                const oplogEntry = this.dbOplog[key]
+                const durationMs = event.duration
+
+                delete this.dbOplog[key]
+
+                this.logger.debug('Mongodb commandFailed operation', {
+                    database: oplogEntry.database,
+                    operation: oplogEntry.opType,
+                    collection: oplogEntry.collection,
+                })
+                this.dbOperationsHistogram?.observe(
+                    {
+                        operation: oplogEntry.opType,
+                        status: MongodbOperationResult.Failed,
+                        database: oplogEntry.database,
+                        ...(oplogEntry.collection && { collection: oplogEntry.collection }),
+                    },
+                    durationMs / 1000,
+                )
+            })
+        } catch (err) {
+            this.logger.error("Couldn't attach commands monitor", { err })
+        }
+    }
+
+    private oplogObserver(): void {
+        this.dbOplogObserver?.observe({}, Object.keys(this.dbOplog).length)
     }
 }

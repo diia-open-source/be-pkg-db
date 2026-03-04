@@ -6,9 +6,28 @@ import { MigrateMongoConfig, MongoDBErrorCode } from './interfaces'
 
 export const MongoHelper = {
     async getMigrateMongoConfig(): Promise<MigrateMongoConfig> {
-        const envService = new EnvService(new DiiaLogger())
+        const logger = new DiiaLogger()
+        const envService = new EnvService(logger)
 
         await envService.init()
+
+        const originalExit = process.exit
+        process.exit = (code): never => {
+            logger.info('Destroying the Env service on process exit...', { code })
+
+            return envService
+                .onDestroy()
+                .then(() => {
+                    logger.info('Env service destroyed, exiting the process...', { code })
+
+                    return originalExit(code)
+                })
+                .catch((err) => {
+                    logger.error('Env service destroy error', { err })
+                    originalExit(code)
+                }) as never
+        }
+
         const user = await envService.getSecret('MONGO_USER', { accessor: 'username', nullable: true })
         const password = await envService.getSecret('MONGO_PASSWORD', { accessor: 'password', nullable: true })
 
@@ -55,9 +74,9 @@ export const MongoHelper = {
     },
 
     getMongoErrorDupField(msg: string, fields: string[]): string | undefined {
-        // eslint-disable-next-line no-restricted-syntax
         for (const field of fields) {
-            const fieldRegExp = new RegExp(`${field}_[0-9] dup key`)
+            // eslint-disable-next-line security/detect-non-literal-regexp
+            const fieldRegExp = new RegExp(`${field}_[0-9] dup key`) // nosemgrep: eslint.detect-non-literal-regexp
 
             if (fieldRegExp.test(msg)) {
                 return field

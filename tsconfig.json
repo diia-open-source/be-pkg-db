@@ -5,8 +5,7 @@
         "declaration": true,
         "declarationDir": "dist/types",
         "baseUrl": ".",
-        "strict": true,
-        "skipLibCheck": true
+        "strict": true
     },
     "include": ["src/**/*"],
     "exclude": ["node_modules"]
