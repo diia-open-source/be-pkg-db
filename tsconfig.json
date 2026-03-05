@@ -1,6 +1,9 @@
 {
     "extends": "@diia-inhouse/configs/tsconfig",
     "compilerOptions": {
+        "lib": ["es2023"],
+        "module": "commonjs",
+        "moduleResolution": "node10",
         "outDir": "dist",
         "declaration": true,
         "declarationDir": "dist/types",
