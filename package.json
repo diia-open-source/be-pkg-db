@@ -1,6 +1,6 @@
 {
     "name": "@diia-inhouse/db",
-    "version": "10.8.1",
+    "version": "10.8.2",
     "description": "Package with database connection",
     "main": "dist/index.js",
     "types": "dist/types/index.d.ts",

@@ -152,7 +152,7 @@ export class EncryptedStorageService {
             expiresAt: new Date(Date.now() + expiration),
         }
 
-        if (this.envService.isStage()) {
+        if (!this.envService.isProd()) {
             storageItem.source = data
         }
 
@@ -182,7 +182,7 @@ export class EncryptedStorageService {
 
         storageItem.data = encryptedData
 
-        if (this.envService.isStage()) {
+        if (!this.envService.isProd()) {
             storageItem.source = data
         }
 
