@@ -171,14 +171,26 @@ describe('EncryptedStorageService', () => {
         it('should successfully set expiration', async () => {
             const id = generateIdentifier()
             const expiration = 10000
-            const storageItem = { save: vi.fn() }
+            const existingExpiresAt = new Date()
 
-            vi.spyOn(encryptedStorageModel, 'findById').mockResolvedValueOnce(storageItem)
-            vi.spyOn(encryptedStorageModel, 'findByIdAndUpdate').mockResolvedValueOnce(storageItem)
+            vi.spyOn(encryptedStorageModel, 'findById').mockResolvedValueOnce({ expiresAt: existingExpiresAt })
+            vi.spyOn(encryptedStorageModel, 'findByIdAndUpdate').mockResolvedValueOnce(null)
 
             expect(await encryptedStorageService.setExpiration(id.toString(), expiration)).toBeUndefined()
             expect(logger.info).toHaveBeenCalledWith('Updated encrypted data expiration date', { id })
-            expect(storageItem).toEqual({ ...storageItem, expiresAt: new Date(Date.now() + expiration) })
+            expect(encryptedStorageModel.findByIdAndUpdate).toHaveBeenCalledWith(id.toString(), {
+                expiresAt: new Date(Date.now() + expiration),
+            })
+        })
+
+        it('should throw NotFoundError when entity is not found', async () => {
+            const id = generateIdentifier()
+            const expiration = 10000
+
+            vi.spyOn(encryptedStorageModel, 'findById').mockResolvedValueOnce(null)
+
+            await expect(encryptedStorageService.setExpiration(id.toString(), expiration)).rejects.toThrow(NotFoundError)
+            expect(logger.error).toHaveBeenCalledWith('Encrypted data is not found in storage', { id })
         })
     })
 })

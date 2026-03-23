@@ -207,12 +207,17 @@ export class EncryptedStorageService {
         this.logger.info(`Encrypted data removed from storage: ${deletedCount}`)
     }
 
-    async setExpiration(id: string, expiration: number, options: QueryOptions = {}): Promise<void> {
-        const storageItem = await this.getStorageItemById(id, options)
+    async setExpiration(id: string, expiration: number): Promise<void> {
+        const expiresAt = await this.findExpirationStrategy[this.databaseAdapter](id)
 
-        storageItem.expiresAt = new Date(Date.now() + expiration)
+        if (!expiresAt) {
+            this.logger.error('Encrypted data is not found in storage', { id })
+            throw new NotFoundError('Missing data')
+        }
 
-        await this.updateEntityStrategy[this.databaseAdapter](id, { expiresAt: storageItem.expiresAt })
+        const newExpiresAt = new Date(Date.now() + expiration)
+
+        await this.updateEntityStrategy[this.databaseAdapter](id, { expiresAt: newExpiresAt })
 
         this.logger.info('Updated encrypted data expiration date', { id })
     }
