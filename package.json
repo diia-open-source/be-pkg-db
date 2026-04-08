@@ -1,10 +1,10 @@
 {
     "name": "@diia-inhouse/db",
-    "version": "10.8.5",
+    "version": "10.8.6",
     "description": "Package with database connection",
     "main": "dist/index.js",
     "types": "dist/types/index.d.ts",
-    "repository": "https://github.com/diia-open-source/be-pkg-db.git",
+    "repository": "https://github.com/diia-open-source/be-pkg-db",
     "author": "Diia",
     "license": "SEE LICENSE IN LICENSE.md",
     "files": [
@@ -48,7 +48,7 @@
         "@diia-inhouse/validators": "1.28.10",
         "@types/migrate-mongo": "10.0.6",
         "bson": "6.10.4",
-        "drizzle-orm": "0.45.1",
+        "drizzle-orm": "0.45.2",
         "lodash": "4.18.1",
         "luxon": "3.7.2",
         "migrate-mongo": "12.1.3",
