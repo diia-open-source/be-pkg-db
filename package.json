@@ -1,6 +1,6 @@
 {
     "name": "@diia-inhouse/db",
-    "version": "10.8.9",
+    "version": "10.8.10",
     "description": "Package with database connection",
     "main": "dist/index.js",
     "types": "dist/types/index.d.ts",
@@ -42,10 +42,10 @@
     },
     "dependencies": {
         "@diia-inhouse/crypto": "1.20.9",
-        "@diia-inhouse/diia-logger": "3.20.0",
-        "@diia-inhouse/diia-metrics": "6.5.24",
-        "@diia-inhouse/utils": "5.3.18",
-        "@diia-inhouse/validators": "1.28.27",
+        "@diia-inhouse/diia-logger": "3.20.1",
+        "@diia-inhouse/diia-metrics": "6.5.25",
+        "@diia-inhouse/utils": "5.3.19",
+        "@diia-inhouse/validators": "1.28.29",
         "@types/migrate-mongo": "10.0.6",
         "bson": "6.10.4",
         "drizzle-orm": "0.45.2",
@@ -65,8 +65,8 @@
     },
     "devDependencies": {
         "@diia-inhouse/configs": "6.1.1",
-        "@diia-inhouse/env": "2.8.15",
-        "@diia-inhouse/errors": "1.18.17",
+        "@diia-inhouse/env": "2.8.16",
+        "@diia-inhouse/errors": "1.18.18",
         "@diia-inhouse/eslint-config": "8.8.0",
         "@diia-inhouse/eslint-plugin": "1.9.5",
         "@diia-inhouse/test": "7.3.17",
