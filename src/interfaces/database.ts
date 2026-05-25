@@ -1,6 +1,6 @@
 import { NodePgDatabase } from 'drizzle-orm/node-postgres'
 
-import * as schema from '../tables'
+import * as schema from '../tables/index.js'
 
 export type DatabaseAdapterType = 'mongo' | 'postgres'
 

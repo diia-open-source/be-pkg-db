@@ -1,8 +1,8 @@
-import DiiaLogger from '@diia-inhouse/diia-logger'
+import { DiiaLogger } from '@diia-inhouse/diia-logger'
 import { EnvService } from '@diia-inhouse/env'
 import { DatabaseError, UnprocessableEntityError } from '@diia-inhouse/errors'
 
-import { MigrateMongoConfig, MongoDBErrorCode } from './interfaces'
+import { MigrateMongoConfig, MongoDBErrorCode } from './interfaces/index.js'
 
 export const MongoHelper = {
     async getMigrateMongoConfig(): Promise<MigrateMongoConfig> {
@@ -11,7 +11,7 @@ export const MongoHelper = {
 
         await envService.init()
 
-        const originalExit = process.exit
+        const originalExit = process.exit.bind(process)
         process.exit = (code): never => {
             logger.info('Destroying the Env service on process exit...', { code })
 
@@ -78,7 +78,8 @@ export const MongoHelper = {
             // eslint-disable-next-line security/detect-non-literal-regexp
             const fieldRegExp = new RegExp(`${field}_[0-9] dup key`) // nosemgrep: eslint.detect-non-literal-regexp
 
-            if (fieldRegExp.test(msg)) {
+            const isMatch = fieldRegExp.test(msg) // nosemgrep: nodejs_scan.javascript-dos-rule-regex_dos
+            if (isMatch) {
                 return field
             }
         }
@@ -94,7 +95,7 @@ export const MongoHelper = {
             const field = MongoHelper.getMongoErrorDupField(err.message, uniqFieldNames)
 
             if (field) {
-                throw new UnprocessableEntityError(`${modelName} with ${field} '${params[field]}' already exists`, {
+                throw new UnprocessableEntityError(`${modelName} with ${field} '${String(params[field])}' already exists`, {
                     field,
                     message: `${field} field unique constraint`,
                     type: 'unique',

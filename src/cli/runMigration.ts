@@ -1,11 +1,11 @@
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 
-import { register } from 'ts-node'
+import { register } from 'tsx/esm/api'
 
 import { Logger } from '@diia-inhouse/types'
 
-import { mongo } from '../interfaces'
+import { mongo } from '../interfaces/index.js'
 
 register()
 

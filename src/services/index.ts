@@ -1,7 +1,7 @@
-export * from './database'
+export * from './database.js'
 
-export * from './postgresDatabase'
+export * from './postgresDatabase.js'
 
-export * from './encryptedStorage'
+export * from './encryptedStorage.js'
 
-export * from './counter'
+export * from './counter.js'

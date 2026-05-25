@@ -1,7 +1,7 @@
 import { DatabaseError } from '@diia-inhouse/errors'
 import { OnInit } from '@diia-inhouse/types'
 
-import { DatabaseAdapterType, PostgresDatabase } from '../interfaces'
+import { DatabaseAdapterType, PostgresDatabase } from '../interfaces/index.js'
 
 export class PostgresDatabaseService implements OnInit {
     constructor(

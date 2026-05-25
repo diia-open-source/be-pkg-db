@@ -1,4 +1,4 @@
-import { DbType } from './dbConfig'
+import { DbType } from './dbConfig.js'
 
 export enum DbConnectionStatus {
     Disconnected = 'disconnected',

@@ -1,5 +1,5 @@
-export * from './counter'
+export * from './counter.js'
 
-export * from './encryptedStorage'
+export * from './encryptedStorage.js'
 
-export * from './statusHistoryItem'
+export * from './statusHistoryItem.js'

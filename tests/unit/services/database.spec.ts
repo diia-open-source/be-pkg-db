@@ -1,8 +1,8 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+/* oxlint-disable vitest/require-mock-type-parameters, typescript/no-explicit-any */
 import mongoose, { ClientSession, Connection } from 'mongoose'
 import { mock } from 'vitest-mock-extended'
 
-import Logger from '@diia-inhouse/diia-logger'
+import { DiiaLogger as Logger } from '@diia-inhouse/diia-logger'
 import { EnvService } from '@diia-inhouse/env'
 import { DatabaseError } from '@diia-inhouse/errors'
 import { HttpStatusCode } from '@diia-inhouse/types'
@@ -235,7 +235,7 @@ describe('DatabaseService', () => {
         it('should fail to begin transaction is case there is no connection', async () => {
             const databaseService = new DatabaseService('mongo', config, envService, logger)
 
-            await expect(databaseService.beginTransaction(DbType.Main)).rejects.toEqual(new DatabaseError('Connection is undefined'))
+            await expect(databaseService.beginTransaction()).rejects.toEqual(new DatabaseError('Connection is undefined'))
         })
 
         it('should fail to begin transaction in case error is occurred when starting transaction session', async () => {

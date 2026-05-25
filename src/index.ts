@@ -1,9 +1,9 @@
-export * from './interfaces'
+export * from './interfaces/index.js'
 
-export * from './services'
+export * from './services/index.js'
 
-export * from './mongo'
+export * from './mongo.js'
 
-export * from './schemas'
+export * from './schemas/index.js'
 
-export * from './postgres'
+export * from './postgres.js'

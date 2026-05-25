@@ -1,8 +1,9 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { integer, pgTable, timestamp, unique, varchar } from 'drizzle-orm/pg-core'
 
-import { timestamps } from '../postgresUtils'
+import { timestamps } from '../postgresUtils.js'
 
-export const counter = pgTable(
+export const counter: any = pgTable(
     'counter',
     {
         code: varchar().notNull(),

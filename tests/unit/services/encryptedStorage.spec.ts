@@ -1,8 +1,9 @@
+/* oxlint-disable vitest/require-mock-type-parameters */
 import { QueryOptions, model, mongo } from 'mongoose'
 import { mock } from 'vitest-mock-extended'
 
 import { AuthService } from '@diia-inhouse/crypto'
-import Logger from '@diia-inhouse/diia-logger'
+import { DiiaLogger as Logger } from '@diia-inhouse/diia-logger'
 import { EnvService } from '@diia-inhouse/env'
 import { NotFoundError } from '@diia-inhouse/errors'
 import { utils } from '@diia-inhouse/utils'
@@ -126,7 +127,7 @@ describe('EncryptedStorageService', () => {
             vi.spyOn(encryptedStorageModel, 'findById').mockResolvedValueOnce(storedData)
             vi.spyOn(encryptedStorageModel, 'findByIdAndUpdate').mockResolvedValueOnce(storedData)
 
-            expect(await encryptedStorageService.update(id.toString(), 'updated-data')).toBeUndefined()
+            expect(await encryptedStorageService.update(id, 'updated-data')).toBeUndefined()
             expect(encryptedStorageModel.findByIdAndUpdate).toHaveBeenCalled()
             expect(storedData).toEqual({ ...storedData, data: encodedData, source: 'updated-data' })
         })
@@ -139,7 +140,7 @@ describe('EncryptedStorageService', () => {
 
             vi.spyOn(encryptedStorageModel, 'findOneAndDelete').mockResolvedValueOnce(storedData)
 
-            expect(await encryptedStorageService.remove(id.toString())).toBeUndefined()
+            expect(await encryptedStorageService.remove(id)).toBeUndefined()
             expect(encryptedStorageModel.findOneAndDelete).toHaveBeenCalledWith({ _id: id })
             expect(logger.info).toHaveBeenCalledWith('Encrypted data removed from storage', { id })
         })
@@ -149,7 +150,7 @@ describe('EncryptedStorageService', () => {
 
             vi.spyOn(encryptedStorageModel, 'findOneAndDelete').mockResolvedValueOnce(null)
 
-            expect(await encryptedStorageService.remove(id.toString())).toBeUndefined()
+            expect(await encryptedStorageService.remove(id)).toBeUndefined()
             expect(encryptedStorageModel.findOneAndDelete).toHaveBeenCalledWith({ _id: id })
             expect(logger.info).toHaveBeenCalledWith('Encrypted data is not removed from storage: data not found', { id })
         })
@@ -162,7 +163,7 @@ describe('EncryptedStorageService', () => {
 
             vi.spyOn(encryptedStorageModel, 'deleteMany').mockResolvedValueOnce(res)
 
-            expect(await encryptedStorageService.deleteMany(ids.map((id) => id.toString()))).toBeUndefined()
+            expect(await encryptedStorageService.deleteMany(ids)).toBeUndefined()
             expect(logger.info).toHaveBeenCalledWith(`Encrypted data removed from storage: ${res.deletedCount}`)
         })
     })
@@ -176,9 +177,9 @@ describe('EncryptedStorageService', () => {
             vi.spyOn(encryptedStorageModel, 'findById').mockResolvedValueOnce({ expiresAt: existingExpiresAt })
             vi.spyOn(encryptedStorageModel, 'findByIdAndUpdate').mockResolvedValueOnce(null)
 
-            expect(await encryptedStorageService.setExpiration(id.toString(), expiration)).toBeUndefined()
+            expect(await encryptedStorageService.setExpiration(id, expiration)).toBeUndefined()
             expect(logger.info).toHaveBeenCalledWith('Updated encrypted data expiration date', { id })
-            expect(encryptedStorageModel.findByIdAndUpdate).toHaveBeenCalledWith(id.toString(), {
+            expect(encryptedStorageModel.findByIdAndUpdate).toHaveBeenCalledWith(id, {
                 expiresAt: new Date(Date.now() + expiration),
             })
         })
@@ -189,7 +190,7 @@ describe('EncryptedStorageService', () => {
 
             vi.spyOn(encryptedStorageModel, 'findById').mockResolvedValueOnce(null)
 
-            await expect(encryptedStorageService.setExpiration(id.toString(), expiration)).rejects.toThrow(NotFoundError)
+            await expect(encryptedStorageService.setExpiration(id, expiration)).rejects.toThrow(NotFoundError)
             expect(logger.error).toHaveBeenCalledWith('Encrypted data is not found in storage', { id })
         })
     })

@@ -4,9 +4,9 @@ import { createRequire } from 'node:module'
 import { sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { Pool } from 'pg'
-import { getConfig } from 'tests/utils'
 
-import * as schema from '../../src/tables'
+import * as schema from '../../src/tables/index.js'
+import { getConfig } from '../utils.js'
 
 const require = createRequire(import.meta.url)
 const config = getConfig()
@@ -67,5 +67,5 @@ export default async (): Promise<void> => {
       END $$;
     `)
 
-    await (db.$client as Pool).end()
+    await db.$client.end()
 }

@@ -5,7 +5,7 @@ import { lt, sql } from 'drizzle-orm'
 import { NodePgClient, NodePgDatabase, drizzle } from 'drizzle-orm/node-postgres'
 import { PgColumn, PgTable, getTableConfig } from 'drizzle-orm/pg-core'
 import { Pool } from 'pg'
-import { register } from 'ts-node'
+import { register } from 'tsx/esm/api'
 
 import { Logger } from '@diia-inhouse/types'
 

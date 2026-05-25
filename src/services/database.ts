@@ -1,4 +1,4 @@
-import { cloneDeep } from 'lodash'
+import lodash from 'lodash'
 import mongoose, { ClientSession } from 'mongoose'
 
 import { Histogram, Observer } from '@diia-inhouse/diia-metrics'
@@ -19,7 +19,10 @@ import {
     MongodbOperationsLabelsMap,
     mongodbOperationsAllowedFields,
     mongodbOperationsDefaultBuckets,
-} from '../interfaces'
+} from '../interfaces/index.js'
+
+// oxlint-disable-next-line typescript/unbound-method
+const { cloneDeep } = lodash
 
 export class DatabaseService implements OnInit, OnHealthCheck, OnDestroy {
     readonly defaultModelsDir = 'models'
@@ -156,7 +159,7 @@ export class DatabaseService implements OnInit, OnHealthCheck, OnDestroy {
                 if (port) {
                     hosts.push(`${host}:${port}`)
                 } else {
-                    hosts.push(`${host}`)
+                    hosts.push(host)
                 }
             }
 

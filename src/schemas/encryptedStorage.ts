@@ -2,9 +2,9 @@ import { Schema } from 'mongoose'
 
 import { DurationS } from '@diia-inhouse/types'
 
-import { EncryptedStorage } from '../interfaces/models/encryptedStorage'
+import { EncryptedStorage } from '../interfaces/models/encryptedStorage.js'
 
-const encryptedStorageSchema = new Schema<EncryptedStorage>(
+const encryptedStorageSchema: Schema<EncryptedStorage> = new Schema<EncryptedStorage>(
     {
         data: { type: String, required: true },
         expiresAt: { type: Date, required: true },

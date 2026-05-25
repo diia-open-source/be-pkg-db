@@ -1,9 +1,8 @@
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { model } from 'mongoose'
-import { dbUtils } from 'tests/mocks/dbUtils'
 
 import { AuthService } from '@diia-inhouse/crypto'
-import DiiaLogger from '@diia-inhouse/diia-logger'
+import { DiiaLogger } from '@diia-inhouse/diia-logger'
 import { EnvService } from '@diia-inhouse/env'
 import { DurationMs } from '@diia-inhouse/types'
 import { RandomUtils } from '@diia-inhouse/utils'
@@ -14,6 +13,7 @@ import { encryptedStorageSchema } from '../../src/schemas/encryptedStorage'
 import { DatabaseService } from '../../src/services/database'
 import { EncryptedStorageService } from '../../src/services/encryptedStorage'
 import * as schema from '../../src/tables'
+import { dbUtils } from '../mocks/dbUtils.js'
 import { getConfig } from '../utils'
 
 const config = getConfig()
@@ -53,7 +53,7 @@ describe('encrypted storage', () => {
         const resultObjectId = await encryptedStorage.save({ data: 1 }, DurationMs.Day)
 
         // Assert
-        const [data] = await dbUtils().encryptedStorage.cleanupBy('id', [resultObjectId as string])
+        const [data] = await dbUtils().encryptedStorage.cleanupBy('id', [resultObjectId])
 
         expect(data).toMatchObject<EncryptedStorage>({
             expiresAt: new Date(mockData + DurationMs.Day),
@@ -76,7 +76,7 @@ describe('encrypted storage', () => {
         const resultObjectId = await encryptedStorage.save(testData, DurationMs.Day)
 
         // Assert
-        const [data] = await dbUtils().encryptedStorage.cleanupBy('id', [resultObjectId as string])
+        const [data] = await dbUtils().encryptedStorage.cleanupBy('id', [resultObjectId])
 
         expect(data).toMatchObject<EncryptedStorage>({
             expiresAt: new Date(mockData + DurationMs.Day),
@@ -178,7 +178,7 @@ describe('encrypted storage', () => {
         const rawData = await encryptedStorage.get(dataId)
 
         // Assert
-        const [data] = await dbUtils().encryptedStorage.cleanupBy('id', [dataId as string])
+        const [data] = await dbUtils().encryptedStorage.cleanupBy('id', [dataId])
 
         expect(data).toMatchObject({
             data: expect.any(String),

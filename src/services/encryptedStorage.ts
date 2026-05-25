@@ -5,11 +5,12 @@ import { AuthService } from '@diia-inhouse/crypto'
 import { EnvService } from '@diia-inhouse/env'
 import { NotFoundError } from '@diia-inhouse/errors'
 import { Logger } from '@diia-inhouse/types'
+// oxlint-disable-next-line eslint/no-restricted-imports
 import { utils } from '@diia-inhouse/utils'
 
-import { DatabaseAdapterType, PostgresDatabase } from '../interfaces'
-import { EncryptedStorage } from '../interfaces/models/encryptedStorage'
-import { encryptedStorage } from '../tables/encryptedStorage'
+import { DatabaseAdapterType, PostgresDatabase } from '../interfaces/index.js'
+import { EncryptedStorage } from '../interfaces/models/encryptedStorage.js'
+import { encryptedStorage } from '../tables/encryptedStorage.js'
 
 /**
  * EncryptedStorageService provides CRUD operations for managing encrypted storage entries
@@ -55,9 +56,9 @@ export class EncryptedStorageService {
                 .insert(encryptedStorage)
                 .values(storageItem)
                 .returning()
-                .then((rows) => rows[0])
+                .then((rows) => (rows as EncryptedStorage[])[0])
 
-            return result.id
+            return result.id!
         },
         mongo: async (storageItem: EncryptedStorage): Promise<string> => {
             const result = await this.getModel().create(storageItem)
@@ -87,7 +88,7 @@ export class EncryptedStorageService {
                 .select()
                 .from(encryptedStorage)
                 .where(eq(encryptedStorage.id, id))
-                .then((rows) => rows[0])
+                .then((rows) => (rows as EncryptedStorage[])[0])
         },
         mongo: async (id: string, options: QueryOptions): Promise<EncryptedStorage | null> => {
             return await this.getModel().findById(id, undefined, options)
@@ -113,7 +114,7 @@ export class EncryptedStorageService {
                 .delete(encryptedStorage)
                 .where(eq(encryptedStorage.id, id))
                 .returning()
-                .then((rows) => rows[0])
+                .then((rows) => (rows as EncryptedStorage[])[0])
         },
         mongo: async (id: string): Promise<EncryptedStorage | null> => {
             return await this.getModel().findOneAndDelete({ _id: id })

@@ -1,8 +1,8 @@
 import { Schema } from 'mongoose'
 
-import { Counter } from '../interfaces/models/counter'
+import { Counter } from '../interfaces/models/counter.js'
 
-const counterSchema = new Schema<Counter>(
+const counterSchema: Schema<Counter> = new Schema<Counter>(
     {
         code: { type: String, required: true },
         value: { type: Number, required: true },

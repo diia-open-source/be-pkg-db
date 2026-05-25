@@ -1,3 +1,3 @@
-export * from './tables'
+export * from './tables/index.js'
 
-export * from './postgresUtils'
+export * from './postgresUtils.js'

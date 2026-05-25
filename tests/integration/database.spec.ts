@@ -1,4 +1,4 @@
-import DiiaLogger from '@diia-inhouse/diia-logger'
+import { DiiaLogger } from '@diia-inhouse/diia-logger'
 import { EnvService } from '@diia-inhouse/env'
 import { HealthCheckResult, HttpStatusCode } from '@diia-inhouse/types'
 
@@ -23,6 +23,7 @@ describe('Database', () => {
         const result = await db.onHealthCheck()
 
         // Assert
+        // oxlint-disable-next-line jest/no-standalone-expect
         expect(result).toMatchObject<HealthCheckResult<MongoDbStatus>>({
             status: HttpStatusCode.OK,
             details: { mongodb: { [DbType.Main]: DbConnectionStatus.Connected } },

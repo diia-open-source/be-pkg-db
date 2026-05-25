@@ -2,9 +2,9 @@ import { sql } from 'drizzle-orm'
 import { DateTime } from 'luxon'
 import { Model } from 'mongoose'
 
-import { DatabaseAdapterType, PostgresDatabase } from '../interfaces'
-import { Counter } from '../interfaces/models/counter'
-import { counter } from '../tables'
+import { DatabaseAdapterType, PostgresDatabase } from '../interfaces/index.js'
+import { Counter } from '../interfaces/models/counter.js'
+import { counter } from '../tables/index.js'
 
 export class CounterService {
     private readonly getNextValueStrategy: Record<DatabaseAdapterType, (code: string) => Promise<number>> = {
@@ -17,12 +17,16 @@ export class CounterService {
                     set: { value: sql`${counter.value} + 1` },
                 })
                 .returning()
-                .then((rows) => rows[0])
+                .then((rows) => (rows as Counter[])[0])
 
             return result.value
         },
         mongo: async (code: string): Promise<number> => {
-            const result = await this.getModel().findOneAndUpdate({ code }, { $inc: { value: 1 } }, { new: true, upsert: true })
+            const result = await this.getModel().findOneAndUpdate(
+                { code },
+                { $inc: { value: 1 } },
+                { returnDocument: 'after', upsert: true },
+            )
 
             return result.value
         },
@@ -38,7 +42,7 @@ export class CounterService {
                     set: { value: sql`${counter.value} + 1` },
                 })
                 .returning()
-                .then((rows) => rows[0])
+                .then((rows) => (rows as Counter[])[0])
 
             return result.value
         },
@@ -46,7 +50,7 @@ export class CounterService {
             const result = await this.getModel().findOneAndUpdate(
                 { code, date: DateTime.now().startOf('day').toJSDate() },
                 { $inc: { value: 1 } },
-                { new: true, upsert: true },
+                { returnDocument: 'after', upsert: true },
             )
 
             return result.value

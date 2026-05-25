@@ -1,15 +1,21 @@
+import mongoose, { Models } from 'mongoose'
+
 export * from 'mongoose'
 
-export * from './database'
+export { mongoose }
 
-export * from './dbConfig'
+export const models: Models = mongoose.models
 
-export * from './errors'
+export * from './database.js'
 
-export * from './migrateMongoConfig'
+export * from './dbConfig.js'
 
-export * from './mongoStatus'
+export * from './errors.js'
 
-export * from './metrics'
+export * from './migrateMongoConfig.js'
 
-export * from './models'
+export * from './mongoStatus.js'
+
+export * from './metrics.js'
+
+export * from './models/index.js'

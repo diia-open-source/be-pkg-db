@@ -1,6 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { customType, timestamp } from 'drizzle-orm/pg-core'
 
-export const timestamps = {
+export const timestamps: { createdAt: any; updatedAt: any } = {
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at')
         .defaultNow()
@@ -8,7 +9,7 @@ export const timestamps = {
         .notNull(),
 }
 
-export const expiringTimestamp = customType<{
+export const expiringTimestamp: any = customType<{
     data: Date
     driverData: string
     configRequired: true

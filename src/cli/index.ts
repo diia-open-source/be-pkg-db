@@ -2,15 +2,15 @@
 import yargs from 'yargs'
 import { hideBin } from 'yargs/helpers'
 
-import DiiaLogger from '@diia-inhouse/diia-logger'
+import { DiiaLogger } from '@diia-inhouse/diia-logger'
 import { EnvService } from '@diia-inhouse/env'
 import { Logger } from '@diia-inhouse/types'
 
-import { DbType } from '../interfaces'
-import { DatabaseService } from '../services/database'
-import { CleanupExpiredDataCommand } from './cleanupExpiredData'
-import { RunMigrationCommand } from './runMigration'
-import { SyncIndexesCommand } from './syncIndexes'
+import { DbType } from '../interfaces/index.js'
+import { DatabaseService } from '../services/database.js'
+import { CleanupExpiredDataCommand } from './cleanupExpiredData.js'
+import { RunMigrationCommand } from './runMigration.js'
+import { SyncIndexesCommand } from './syncIndexes.js'
 
 async function createDatabaseService(envService: EnvService, logger: Logger): Promise<DatabaseService> {
     return new DatabaseService(
