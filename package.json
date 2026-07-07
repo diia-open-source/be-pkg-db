@@ -1,6 +1,6 @@
 {
     "name": "@diia-inhouse/db",
-    "version": "12.3.11",
+    "version": "12.3.12",
     "type": "module",
     "description": "Package with database connection",
     "main": "dist/index.js",
@@ -40,7 +40,7 @@
         "lint:lockfile": "lockfile-lint --path package-lock.json --allowed-hosts registry.npmjs.org --validate-https"
     },
     "dependencies": {
-        "@diia-inhouse/crypto": "2.0.31",
+        "@diia-inhouse/crypto": "2.0.32",
         "@diia-inhouse/diia-logger": "4.4.8",
         "@diia-inhouse/diia-metrics": "7.1.46",
         "@diia-inhouse/utils": "6.0.43",
