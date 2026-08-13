@@ -10,7 +10,7 @@ import { utils } from '@diia-inhouse/utils'
 
 import { DatabaseAdapterType } from '../../../src/interfaces/database'
 import { encryptedStorageSchema } from '../../../src/schemas/encryptedStorage'
-import { EncryptedStorageService } from '../../../src/services'
+import { EncryptedStorageService, buildEncryptedStorageEntry } from '../../../src/services'
 import { generateIdentifier } from '../../mocks/randomData'
 
 vi.mock('@diia-inhouse/utils', () => ({ utils: { decodeObjectFromBase64: vi.fn(), encodeObjectToBase64: vi.fn() } }))
@@ -136,7 +136,7 @@ describe('EncryptedStorageService', () => {
     describe('method: `remove`', () => {
         it('successfully remove encrypted data from storage', async () => {
             const id = generateIdentifier()
-            const storedData = { save: vi.fn() }
+            const storedData = new encryptedStorageModel({ _id: id })
 
             vi.spyOn(encryptedStorageModel, 'findOneAndDelete').mockResolvedValueOnce(storedData)
 
@@ -192,6 +192,33 @@ describe('EncryptedStorageService', () => {
 
             await expect(encryptedStorageService.setExpiration(id, expiration)).rejects.toThrow(NotFoundError)
             expect(logger.error).toHaveBeenCalledWith('Encrypted data is not found in storage', { id })
+        })
+    })
+
+    describe('function: `buildEncryptedStorageEntry`', () => {
+        it('should encrypt the base64 encoded payload', async () => {
+            const payload = { rnokpp: '1234567890' }
+            const encodedData = Buffer.from('data').toString('base64')
+            const expiration = 1000
+
+            vi.mocked(utils.encodeObjectToBase64).mockReturnValueOnce(encodedData)
+            vi.mocked(auth.encryptJWE).mockResolvedValueOnce('jwe')
+
+            expect(await buildEncryptedStorageEntry(auth, payload, expiration, true)).toEqual({
+                data: 'jwe',
+                expiresAt: new Date(Date.now() + expiration),
+                source: payload,
+            })
+            expect(utils.encodeObjectToBase64).toHaveBeenCalledWith(payload)
+            expect(auth.encryptJWE).toHaveBeenCalledWith(encodedData)
+        })
+
+        it('should omit the source when it is not wanted', async () => {
+            vi.mocked(auth.encryptJWE).mockResolvedValueOnce('jwe')
+
+            const entry = await buildEncryptedStorageEntry(auth, { rnokpp: '1234567890' }, 1000, false)
+
+            expect(entry.source).toBeUndefined()
         })
     })
 })

@@ -12,6 +12,26 @@ import { DatabaseAdapterType, PostgresDatabase } from '../interfaces/index.js'
 import { EncryptedStorage } from '../interfaces/models/encryptedStorage.js'
 import { encryptedStorage } from '../tables/encryptedStorage.js'
 
+export type JweEncrypter = Pick<AuthService, 'encryptJWE'>
+
+export async function buildEncryptedStorageEntry(
+    auth: JweEncrypter,
+    data: unknown,
+    expiration: number,
+    withSource: boolean,
+): Promise<EncryptedStorage> {
+    const storageItem: EncryptedStorage = {
+        data: await auth.encryptJWE(utils.encodeObjectToBase64(data)),
+        expiresAt: new Date(Date.now() + expiration),
+    }
+
+    if (withSource) {
+        storageItem.source = data
+    }
+
+    return storageItem
+}
+
 /**
  * EncryptedStorageService provides CRUD operations for managing encrypted storage entries
  * in both Postgres and MongoDB databases. The service abstracts database implementation details
@@ -146,16 +166,7 @@ export class EncryptedStorageService {
     ) {}
 
     async save<T>(data: T, expiration: number): Promise<string> {
-        const encryptedData = await this.auth.encryptJWE(utils.encodeObjectToBase64(data))
-
-        const storageItem: EncryptedStorage = {
-            data: encryptedData,
-            expiresAt: new Date(Date.now() + expiration),
-        }
-
-        if (!this.envService.isProd()) {
-            storageItem.source = data
-        }
+        const storageItem = await buildEncryptedStorageEntry(this.auth, data, expiration, !this.envService.isProd())
 
         return await this.saveEntityStrategy[this.databaseAdapter](storageItem)
     }
