@@ -53,6 +53,11 @@ export class DatabaseService implements OnInit, OnHealthCheck, OnDestroy {
         readPreference: 'primary',
     }
 
+    /**
+     * https://www.mongodb.com/docs/manual/core/read-preference-staleness/
+     */
+    private readonly secondaryPreferredMaxStalenessSeconds = 90
+
     constructor(
         private readonly databaseAdapter: DatabaseAdapterType,
         private readonly dbConfigs: Partial<Record<DbType, AppDbConfig>>,
@@ -195,6 +200,10 @@ export class DatabaseService implements OnInit, OnHealthCheck, OnDestroy {
 
             if (readPreference) {
                 query.push(`readPreference=${readPreference}`)
+            }
+
+            if (readPreference === mongoose.mongo.ReadPreference.SECONDARY_PREFERRED) {
+                query.push(`maxStalenessSeconds=${this.secondaryPreferredMaxStalenessSeconds}`)
             }
 
             if (authMechanism) {

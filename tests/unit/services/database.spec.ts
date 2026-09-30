@@ -182,6 +182,18 @@ describe('DatabaseService', () => {
                 },
                 { auth: { password: '********', username: '********' }, dbName: 'test', replicaSet: 'rs0' },
             ],
+            [
+                'secondaryPreferred read preference is provided',
+                DbType.Main,
+                { ...config[DbType.Main], readPreference: 'secondaryPreferred' },
+                {
+                    connection: vi.mocked(mongoose.connection),
+                    connectionOptions: { auth: { password: 'password', username: 'user' }, dbName: 'test', replicaSet: 'rs0' },
+                    connectionString:
+                        'mongodb://mongo.replica.test.host:27017/?authSource=admin&readPreference=secondaryPreferred&maxStalenessSeconds=90',
+                },
+                { auth: { password: '********', username: '********' }, dbName: 'test', replicaSet: 'rs0' },
+            ],
         ])(
             'should successfully create connection when %s',
             async (_msg, type: DbType, inputConfig: AppDbConfig, expectedConnection, expectedLogOptions) => {
