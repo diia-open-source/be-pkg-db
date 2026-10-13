@@ -1,13 +1,9 @@
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 
-import { register } from 'tsx/esm/api'
-
 import { Logger } from '@diia-inhouse/types'
 
 import { mongo } from '../interfaces/index.js'
-
-register()
 
 export class RunMigrationCommand {
     private readonly changelogCollectionName = 'migrations-history'
@@ -33,6 +29,9 @@ export class RunMigrationCommand {
         const startTime = Date.now()
         const execScriptName = execDown ? 'down' : 'up'
 
+        const { register } = await import('tsx/esm/api')
+
+        register()
         const modelModule = await import(path.resolve(scriptPath))
         const { up, down } = modelModule
 
