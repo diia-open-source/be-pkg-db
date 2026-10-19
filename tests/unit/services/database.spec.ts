@@ -296,4 +296,14 @@ describe('DatabaseService', () => {
             expect(await databaseService.beginTransaction()).toEqual(sessionMock)
         })
     })
+
+    describe('method: `withTransaction`', () => {
+        it('should fail to run transaction in case there is no connection', async () => {
+            const databaseService = new DatabaseService('mongo', config, envService, logger)
+            const fn = vi.fn()
+
+            await expect(databaseService.withTransaction(fn)).rejects.toEqual(new DatabaseError('Connection is undefined'))
+            expect(fn).not.toHaveBeenCalled()
+        })
+    })
 })

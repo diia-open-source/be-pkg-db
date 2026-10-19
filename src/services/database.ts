@@ -3,7 +3,7 @@ import mongoose, { ClientSession } from 'mongoose'
 
 import { Histogram, Observer } from '@diia-inhouse/diia-metrics'
 import { EnvService } from '@diia-inhouse/env'
-import { DatabaseError } from '@diia-inhouse/errors'
+import { DatabaseError, ErrorType } from '@diia-inhouse/errors'
 import { HealthCheckResult, HttpStatusCode, Logger, OnDestroy, OnHealthCheck, OnInit } from '@diia-inhouse/types'
 
 import {
@@ -17,6 +17,7 @@ import {
     MongoDbStatus,
     MongodbOperationResult,
     MongodbOperationsLabelsMap,
+    WithTransactionOptions,
     mongodbOperationsAllowedFields,
     mongodbOperationsDefaultBuckets,
 } from '../interfaces/index.js'
@@ -267,12 +268,7 @@ export class DatabaseService implements OnInit, OnHealthCheck, OnDestroy {
      * - Will abort transaction and end session if any errors occur during setup
      */
     async beginTransaction(options?: mongoose.mongo.TransactionOptions): Promise<ClientSession> {
-        const connection = this.db[DbType.Main]?.connection
-
-        if (!connection) {
-            throw new DatabaseError('Connection is undefined')
-        }
-
+        const connection = this.getMainConnection()
         const session = await connection.startSession()
 
         try {
@@ -289,6 +285,53 @@ export class DatabaseService implements OnInit, OnHealthCheck, OnDestroy {
             await session.endSession()
 
             throw new DatabaseError('Unable to begin transaction', { err })
+        }
+    }
+
+    async withTransaction<T>(fn: mongoose.mongo.WithTransactionCallback<T>, options: WithTransactionOptions = {}): Promise<T> {
+        const { retries, ...transactionOptions } = options
+        let attemptsCount = 0
+
+        const connection = this.getMainConnection()
+        const session = await connection.startSession()
+
+        try {
+            return await session.withTransaction(
+                async (transactionSession) => {
+                    const isRetriesLimitReached = retries !== undefined && attemptsCount > retries
+                    if (isRetriesLimitReached) {
+                        throw new DatabaseError('Failed to complete transaction. No retries left', {}, undefined, ErrorType.Unoperated)
+                    }
+
+                    attemptsCount++
+
+                    try {
+                        return await fn(transactionSession)
+                    } catch (err) {
+                        if (this.isTransientTransactionError(err)) {
+                            this.logger.warn('Transient transaction error (retryable)', { err, attemptsCount })
+                        }
+
+                        throw err
+                    }
+                },
+                { ...this.defaultTransactionOptions, ...transactionOptions },
+            )
+        } catch (err) {
+            this.logger.error('Transaction failed', { err, attemptsCount })
+
+            const isTransactionFailure =
+                err instanceof mongoose.mongo.MongoOperationTimeoutError ||
+                this.isTransientTransactionError(err) ||
+                this.isUnknownTransactionCommitResultError(err)
+
+            if (isTransactionFailure) {
+                throw new DatabaseError('Failed to complete transaction', {}, undefined, ErrorType.Unoperated)
+            }
+
+            throw err
+        } finally {
+            await session.endSession()
         }
     }
 
@@ -370,5 +413,23 @@ export class DatabaseService implements OnInit, OnHealthCheck, OnDestroy {
 
     private oplogObserver(): void {
         this.dbOplogObserver?.observe({}, Object.keys(this.dbOplog).length)
+    }
+
+    private isTransientTransactionError(err: unknown): boolean {
+        return err instanceof mongoose.mongo.MongoError && err.hasErrorLabel(mongoose.mongo.MongoErrorLabel.TransientTransactionError)
+    }
+
+    private isUnknownTransactionCommitResultError(err: unknown): boolean {
+        return err instanceof mongoose.mongo.MongoError && err.hasErrorLabel(mongoose.mongo.MongoErrorLabel.UnknownTransactionCommitResult)
+    }
+
+    private getMainConnection(): mongoose.Connection {
+        const connection = this.db[DbType.Main]?.connection
+
+        if (!connection) {
+            throw new DatabaseError('Connection is undefined')
+        }
+
+        return connection
     }
 }
