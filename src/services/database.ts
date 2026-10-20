@@ -288,6 +288,23 @@ export class DatabaseService implements OnInit, OnHealthCheck, OnDestroy {
         }
     }
 
+    /**
+     * Runs the callback in a transaction on the main connection and commits it.
+     * Params of `retries` and `timeoutMS` can be combined: whichever runs out first ends the transaction.
+     * Without explicit `timeoutMS`, the driver stops starting new retries after 120s but never interrupts a running attempt.
+     * @param fn - Callback that receives the transaction session. Must `await` every operation and pass `{ session }` to each
+     * @param options - Transaction options merged over the defaults (readPreference: primary), plus `retries` and `timeoutMS`
+     * @returns The callback result after a successful commit
+     * @throws {DatabaseError} "Connection is undefined" if the main connection is missing
+     * @throws {DatabaseError} "Failed to complete transaction. No retries left" when `retries` are exhausted
+     * @throws {DatabaseError} "Failed to complete transaction" on timeout, unknown commit result or a transient error after the retry window
+     *
+     * @remarks
+     * - The callback may run several times, so it must be safe to re-run (no external calls or events inside)
+     * - Operations without `{ session }` are not part of the transaction and ignore `timeoutMS`
+     * - Do not run operations in parallel (`Promise.all`, `Promise.race`, etc.) inside the callback
+     * - Any other error from the callback is rethrown as is, without retries
+     */
     async withTransaction<T>(fn: mongoose.mongo.WithTransactionCallback<T>, options: WithTransactionOptions = {}): Promise<T> {
         const { retries, ...transactionOptions } = options
         let attemptsCount = 0
