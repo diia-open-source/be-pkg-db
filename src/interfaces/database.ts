@@ -18,11 +18,11 @@ export interface WithTransactionOptions extends mongo.TransactionOptions {
     /**
      * Max number of callback re-runs after a TransientTransactionError (total attempts = retries + 1).
      * When exhausted, throws DatabaseError "Failed to complete transaction. No retries left".
-     * When omitted, retries are limited only by the given timeout (`timeoutMS`, or the driver's 120s default).
+     * When omitted, retries are limited only by the given timeout (`timeoutMS`, 10s by default).
      */
     retries?: number
     /**
-     * Configures a timeoutMS expiry for the entire withTransactionCallback.
+     * Configures a timeoutMS expiry for the entire withTransactionCallback. Defaults to 10s.
      *
      * @remarks
      * - The remaining timeout will not be applied to callback operations that do not use the ClientSession.

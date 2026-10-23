@@ -54,6 +54,8 @@ export class DatabaseService implements OnInit, OnHealthCheck, OnDestroy {
         readPreference: 'primary',
     }
 
+    private readonly defaultTransactionTimeoutMS = 10_000
+
     /**
      * https://www.mongodb.com/docs/manual/core/read-preference-staleness/
      */
@@ -291,9 +293,9 @@ export class DatabaseService implements OnInit, OnHealthCheck, OnDestroy {
     /**
      * Runs the callback in a transaction on the main connection and commits it.
      * Params of `retries` and `timeoutMS` can be combined: whichever runs out first ends the transaction.
-     * Without explicit `timeoutMS`, the driver stops starting new retries after 120s but never interrupts a running attempt.
+     * Without explicit `timeoutMS`, defaults to 10s: no new retries start after it and a running attempt is interrupted.
      * @param fn - Callback that receives the transaction session. Must `await` every operation and pass `{ session }` to each
-     * @param options - Transaction options merged over the defaults (readPreference: primary), plus `retries` and `timeoutMS`
+     * @param options - Transaction options merged over the defaults (readPreference: primary, timeoutMS: 10s), plus `retries`
      * @returns The callback result after a successful commit
      * @throws {DatabaseError} "Connection is undefined" if the main connection is missing
      * @throws {DatabaseError} "Failed to complete transaction. No retries left" when `retries` are exhausted
@@ -306,7 +308,7 @@ export class DatabaseService implements OnInit, OnHealthCheck, OnDestroy {
      * - Any other error from the callback is rethrown as is, without retries
      */
     async withTransaction<T>(fn: mongoose.mongo.WithTransactionCallback<T>, options: WithTransactionOptions = {}): Promise<T> {
-        const { retries, ...transactionOptions } = options
+        const { retries, timeoutMS = this.defaultTransactionTimeoutMS, ...transactionOptions } = options
         let attemptsCount = 0
 
         const connection = this.getMainConnection()
@@ -332,7 +334,7 @@ export class DatabaseService implements OnInit, OnHealthCheck, OnDestroy {
                         throw err
                     }
                 },
-                { ...this.defaultTransactionOptions, ...transactionOptions },
+                { ...this.defaultTransactionOptions, ...transactionOptions, timeoutMS },
             )
         } catch (err) {
             this.logger.error('Transaction failed', { err, attemptsCount })
