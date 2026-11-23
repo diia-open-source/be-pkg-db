@@ -109,9 +109,9 @@ export class CleanupExpiredDataCommand {
 
         for (const table of tables) {
             const expiringColumns = table.columns
-                .filter((column) => this.isExpiringColumn(column as unknown as PgColumn))
+                .filter((column) => this.isExpiringColumn(column))
                 .map((column) => ({
-                    column: column as unknown as PgColumn,
+                    column,
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     expireAfterSeconds: (column['config'] as any).fieldConfig.expireAfterSeconds,
                 }))
