@@ -97,6 +97,24 @@ describe('Database', () => {
             expect(countersBeforeCommit).toEqual([])
             expect(counters).toHaveLength(1)
         })
+
+        it('should fail with database error and end the session when the transaction cannot start', async () => {
+            // Arrange
+            const db = new DatabaseService('mongo', config.db, envService, logger)
+
+            await db.onInit()
+
+            const endSessionSpy = vi.spyOn(mongo.ClientSession.prototype, 'endSession')
+
+            // Act
+            const sessionPromise = db.beginTransaction({ writeConcern: { w: 0 } })
+
+            // Assert
+            await expect(sessionPromise).rejects.toThrow(
+                new DatabaseError('Unable to begin transaction', { err: expect.any(mongo.MongoTransactionError) }),
+            )
+            expect(endSessionSpy).toHaveBeenCalledTimes(1)
+        })
     })
 
     describe.runIf(databaseAdapter === 'mongo')('method: `withTransaction`', () => {

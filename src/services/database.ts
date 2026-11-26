@@ -267,7 +267,7 @@ export class DatabaseService implements OnInit, OnHealthCheck, OnDestroy {
      * @remarks
      * - Uses the main database connection to start the session
      * - Applies default transaction options (readPreference: primary)
-     * - Will abort transaction and end session if any errors occur during setup
+     * - Ends the session if the transaction fails to start
      */
     async beginTransaction(options?: mongoose.mongo.TransactionOptions): Promise<ClientSession> {
         const connection = this.getMainConnection()
@@ -283,7 +283,6 @@ export class DatabaseService implements OnInit, OnHealthCheck, OnDestroy {
 
             return session
         } catch (err) {
-            await session.abortTransaction()
             await session.endSession()
 
             throw new DatabaseError('Unable to begin transaction', { err })

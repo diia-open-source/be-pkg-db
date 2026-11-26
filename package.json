@@ -1,6 +1,6 @@
 {
     "name": "@diia-inhouse/db",
-    "version": "12.10.2",
+    "version": "12.10.3",
     "description": "Package with database connection",
     "license": "SEE LICENSE IN LICENSE.md",
     "author": "diia-team",
