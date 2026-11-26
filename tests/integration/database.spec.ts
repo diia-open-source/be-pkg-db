@@ -42,6 +42,63 @@ describe('Database', () => {
         })
     })
 
+    it.runIf(databaseAdapter === 'mongo')('should return unavailable health status when a connection is closed', async () => {
+        // Arrange
+        const db = new DatabaseService('mongo', { [DbType.Cache]: { ...config.db[DbType.Main], isEnabled: true } }, envService, logger)
+
+        await db.onInit()
+        await db.db[DbType.Cache]?.connection.close()
+
+        // Act
+        const result = await db.onHealthCheck()
+
+        // Assert
+        // oxlint-disable-next-line jest/no-standalone-expect
+        expect(result).toMatchObject<HealthCheckResult<MongoDbStatus>>({
+            status: HttpStatusCode.SERVICE_UNAVAILABLE,
+            details: { mongodb: { [DbType.Cache]: DbConnectionStatus.OpFailed } },
+        })
+    })
+
+    it('should fail to connect when both host and replica set nodes are configured', async () => {
+        // Arrange
+        const db = new DatabaseService('mongo', { [DbType.Main]: { ...config.db[DbType.Main], host: 'mongo1' } }, envService, logger)
+
+        // Act
+        const initPromise = db.onInit()
+
+        // Assert
+        await expect(initPromise).rejects.toThrow(new DatabaseError('Failed to connect to Database'))
+    })
+
+    describe.runIf(databaseAdapter === 'mongo')('method: `beginTransaction`', () => {
+        it('should keep writes out of reads outside the session until the transaction is committed', async () => {
+            // Arrange
+            const db = new DatabaseService('mongo', config.db, envService, logger)
+
+            await db.onInit()
+            await counterModel.init()
+
+            const code = generateIdentifier()
+            const session = await db.beginTransaction()
+
+            onTestFinished(() => session.endSession())
+
+            await counterModel.create([{ code, value: 1 }], { session })
+
+            const countersBeforeCommit = await counterModel.find({ code })
+
+            // Act
+            await session.commitTransaction()
+
+            // Assert
+            const counters = await dbUtils().counter.cleanupBy('code', [code])
+
+            expect(countersBeforeCommit).toEqual([])
+            expect(counters).toHaveLength(1)
+        })
+    })
+
     describe.runIf(databaseAdapter === 'mongo')('method: `withTransaction`', () => {
         const db = new DatabaseService('mongo', config.db, envService, logger)
 
@@ -147,6 +204,17 @@ describe('Database', () => {
             expect(commitSpy).toHaveBeenCalledTimes(1)
             expect(counters).toEqual([])
             expect(encryptedStorages).toEqual([])
+        })
+
+        it('should fail with database error when the main connection is not initialized', async () => {
+            // Arrange
+            const uninitializedDb = new DatabaseService('mongo', config.db, envService, logger)
+
+            // Act
+            const resultPromise = uninitializedDb.withTransaction(async () => {})
+
+            // Assert
+            await expect(resultPromise).rejects.toThrow(new DatabaseError('Connection is undefined'))
         })
 
         it('should rethrow error without retrying when error is not transient', async () => {
